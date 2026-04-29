@@ -20,6 +20,7 @@ body {
 button {
     border: none;
     outline: none;
+    background-color: transparent;
 }
 
 body {
@@ -197,12 +198,14 @@ section#players:not(.selected) {
     text-decoration: none;
 
     --visible: 0;
-    /* --width: calc(var(--visible) * var(--size) * var(--max-bubble-size)); */
     width: var(--max-bubble-size);
     height: var(--max-bubble-size);
     font-size: calc(var(--max-bubble-size) / 5);
 
     border-radius: 50%;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
 
     position: absolute;
     left: var(--pad);
@@ -219,20 +222,21 @@ section#players:not(.selected) {
   transition:
         translate var(--transition-time) ease-in-out,
         scale var(--transition-time) ease-in-out,
-        transform 0.2s ease-in-out,
-        filter 0.2s ease-in-out,
-        box-shadow 0.2s ease-in-out;
+        transform 0.15s ease-in-out,
+        filter 0.15s ease-in-out,
+        box-shadow 0.15s ease-in-out;
 }
 
 .bubble:hover {
     z-index: 5;
 
-    transform: scale(1.2);
+    transform: scale(1.3);
 
-    filter: brightness(1.1);
-    box-shadow:
-        0 5px 10px rgba(0, 0, 0, 0.3),
-        inset 0 0 0 5px rgba(255, 255, 255, 0.4);
+    filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.5)) brightness(1.2);
+
+    /* box-shadow: */
+    /*     0 5px 10px rgba(0, 0, 0, 0.3), */
+    /*     inset 0 0 0 5px rgba(255, 255, 255, 0.4); */
 }
 
 .measure-bubble {

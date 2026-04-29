@@ -262,10 +262,16 @@ export class BubbleMap {
       const bubble = document.createElement("button");
       bubble.className = "bubble";
       bubble.classList.add("transition");
+
       bubble.id = `${this.containerIdPrefix}${item}`;
 
-      bubble.textContent = this.metadataLoader.getValue(item, this.bubbleContent);
-      bubble.style.background = this.metadataLoader.getValue(item, this.bubbleColor);
+      const background = this.metadataLoader.getValue(item, this.bubbleColor);
+      if (background.includes("url")) {
+        bubble.style.backgroundImage = background;
+      } else {
+        bubble.textContent = this.metadataLoader.getValue(item, this.bubbleContent);
+        bubble.style.background = background;
+      }
 
       bubble.addEventListener("click", (e) => {
         if (this.dragHasMoved) return;
