@@ -273,6 +273,7 @@ export class BubbleMap {
 
         this.statsItem = item;
         this.statsUpdate(this.stats, this.seasonsLoader, this.metadataLoader, this.currentYear, item);
+        this.statsArea.style.background = bubble.style.background;
 
         this.stats.classList.add("active");
       });
