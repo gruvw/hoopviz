@@ -1,5 +1,6 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import * as Data from "./data.js";
+import { drawShotChart, loadShots } from "./ShotChart.js";
 
 // TODO set all attributes
 
@@ -82,19 +83,6 @@ export function updatePlayerStats(container, seasonsLoader, metadataLoader, curr
   let playerData = seasonData.get(playerId);
   content.innerText = attributesDisplay.map((display, index) => display + ": " + playerData[index]).join("\n");
 
-  // D3.js example
-  const dataMap = new Map([
-    ["1", [35, 117]], ["2", [43, 114]], ["3", [40, 118]], ["4", [22, 115]]
-  ]);
-  const data = Array.from(dataMap.values()).map(d => d[0]);
-
-  d3.select("#player-chart")
-    .selectAll("rect")
-    .data(data)
-    .join("rect")
-    .attr("x", (_, i) => i * 45 + 10)
-    .attr("y", d => 150 - d)
-    .attr("width", 40)
-    .attr("height", d => d)
-    .attr("fill", "steelblue");
+  const chartEl = document.getElementById("player-chart");
+  loadShots(playerId, currentYear).then(shots => drawShotChart(chartEl, shots));
 }
