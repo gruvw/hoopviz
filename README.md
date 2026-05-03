@@ -22,3 +22,20 @@ Project of Data Visualization (EPFL COM-480) - 2026
 - [Milestone 3](./deliverables/ms3/ms3.md)
 
 **Note**: Each deliverable comes with its associated GitHub release of the repository.
+
+## Development setup
+
+If you want to run the website locally it's very simple. The whole website is static so you can clone the repository and run an HTTP server in the `src` folder. There is no build step.
+
+```bash
+git clone https://github.com/com-480-data-visualization/HoopViz
+cd HoopViz/src
+python -m http.server
+```
+
+## Repository structure
+
+- `data`: everything related to our dataset with instructions to reproduce it.
+- `deliverables`: deliverables for the EPFL COM-480 course.
+- `scripts`: code we wrote to explore the data or pre-process it.
+- `src`: code for the visualization website.
