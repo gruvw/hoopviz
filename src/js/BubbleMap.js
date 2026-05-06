@@ -55,7 +55,7 @@ export class BubbleMap {
     this.statsItem = null;
     this.currentYear = null;
 
-    this.built = options.build([this.attributeY, this.attributeSize, this.attributeX]);
+    this.built = options.build([this.attributeY, this.attributeSize, this.attributeX], this.attributes, this.statsUpdate);
 
     this.ready = this.init();
   }
@@ -322,6 +322,12 @@ export class BubbleMap {
             });
 
             this.built.bubbleMapAttributes = [this.attributeY, this.attributeSize, this.attributeX];
+            this.built.radarAttributes = this.built.radarAttributes.map((a) => this.built.bubbleMapAttributes.includes(a) ? null : a);
+            const missingCount = this.built.radarAttributes.filter(item => item === null).length;
+            const missings = Utils.pickItemsWithout(this.attributes, this.built.radarAttributes.concat(this.built.bubbleMapAttributes), missingCount);
+            var i = 0;
+            this.built.radarAttributes = this.built.radarAttributes.map((a) => a == null ? missings[i++] : a);
+
             this.updateSelectors();
             this.updateBubbles();
           });

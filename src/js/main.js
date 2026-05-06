@@ -22,42 +22,86 @@ new Screens({
     bubbleColor: (row) => "url(https://i.logocdn.com/nba/2024/" + row["teamSlug"] + ".svg)",
     statsUpdate: Stats.updateTeamStats,
     attributes: Stats.TEAM_ATTRIBUTES,
-    build: (bubbleMapAttributes) => {
-      var margin = { top: 100, right: 100, bottom: 100, left: 100 },
+    build: (bubbleMapAttributes, allAttributes, statsUpdate) => {
+      const margin = { top: 100, right: 100, bottom: 100, left: 100 },
         width = 300,
         height = 300;
 
-      var color = ["#CC333F"];
+      const color = ["#CC333F"];
 
-      var radarChartOptions = {
+      const radarInitialAttributes = Utils.pickItemsWithout(allAttributes, bubbleMapAttributes, RADAR_AXES - bubbleMapAttributes.length);
+
+      const radarChartOptions = {
         w: width, h: height, margin: margin,
         maxValue: 1, levels: 4, roundStrokes: true, color: color,
-        axisContent: function(axisName, index) {
-          var div = document.createElement("div");
+        allAttributes: allAttributes,
+        bubbleMapAttributes: bubbleMapAttributes,
+        radarAttributes: radarInitialAttributes,
+        axisContent: function(options, index) {
+          const { allAttributes, bubbleMapAttributes, radarAttributes } = options;
+
+          const fullRadar = Utils.makeList(bubbleMapAttributes, radarAttributes);
+          const radarAvailable = Utils.listWithout(allAttributes, bubbleMapAttributes);
+
+          const labelContainer = document.createElement("div");
 
           if (index === 0 || index === 1 || index == RADAR_AXES - 1) {
-            div.classList.add("radar-naked-label");
-            div.innerText = axisName;
+            labelContainer.classList.add("radar-naked-label");
+            labelContainer.innerText = fullRadar[index][0];
           } else {
-            div.classList.add("radar-label");
-            div.innerText = axisName;
-          }
-            div.addEventListener("click", (_) => console.log("HEY"));
+            labelContainer.classList.add("radar-labels");
 
-          return div;
+            const label = document.createElement("div");
+            label.classList.add("radar-label");
+            label.innerText = fullRadar[index][0];
+            labelContainer.appendChild(label)
+
+            const selector = document.createElement("div");
+            selector.classList.add("radar-selector");
+            radarAvailable.forEach(attribute => {
+              const span = document.createElement("span");
+              span.innerText = attribute[0];
+              selector.appendChild(span);
+
+              if (attribute === fullRadar[index]) {
+                span.classList.add("selected");
+              }
+
+              span.addEventListener("click", (_) => {
+                const previous = fullRadar[index];
+                const next = radarAttributes.map((a) => a == previous ? attribute : a);
+                options.radarAttributes = radarAttributes.map((a) => a == previous ? attribute : a == attribute ? Utils.pickItemsWithout(radarAvailable, next.concat([previous]), 1)[0] : a);
+                statsUpdate();
+              });
+            });
+
+            selector.style.display = "none";
+            labelContainer.addEventListener("click", (_) => {
+              if (selector.style.display === "none") {
+                document.querySelectorAll(".radar-selector").forEach(e => e.style.display = "none");
+                selector.style.display = "flex";
+              } else {
+                selector.style.display = "none";
+              }
+            });
+
+            labelContainer.appendChild(selector);
+          }
+
+          return labelContainer;
         }
       };
 
-      let radarInitialAttributes = Utils.listWith(bubbleMapAttributes, Stats.TEAM_ATTRIBUTES, RADAR_AXES);
-      let radarFullAttributes = Utils.makeList(bubbleMapAttributes, radarInitialAttributes);
-      let start = [
-        radarFullAttributes.map((a) => { return { axis: a[0], value: 0 }; })
+      const radarFullAttributes = Utils.makeList(bubbleMapAttributes, radarInitialAttributes);
+      const start = [
+        radarFullAttributes.map((_, i) => { return { axis: i, value: 0 }; })
       ];
 
-      let radar = RadarChart("#team-radar", start, radarChartOptions);
+      const radar = RadarChart("#team-radar", start, radarChartOptions);
 
       return {
         radar: radar,
+        allAttributes: allAttributes,
         bubbleMapAttributes: bubbleMapAttributes,
         radarAttributes: radarInitialAttributes,
       };

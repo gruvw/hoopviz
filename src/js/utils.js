@@ -21,27 +21,28 @@ const rotate1 = (list) => {
   return [...rest, first];
 }
 
+export function listWithout(fullList, toExclude) {
+  return fullList.filter(item => !toExclude.includes(item))
+}
+
 /**
- * @param {Array} mustInclude - Elements that must be in the result.
  * @param {Array} pool - Elements to draw from if more are needed.
- * @param {number} desiredLength - The target length of the final list.
+ * @param {Array} without - Elements that must not be in the result.
+ * @param {number} desiredLength - The target length of the result list.
  *
- * @returns the end of the result, without `mustInclude`
+ * @returns {Array} the items picked randomly
  */
-export function listWith(mustInclude, pool, desiredLength) {
-  const result = [...mustInclude];
+export function pickItemsWithout(pool, without, desiredLength) {
+  const excludedSet = new Set(without);
 
-  if (result.length >= desiredLength) return [];
+  const candidates = pool.filter(item => !excludedSet.has(item));
 
-  const available = pool.filter(item => !result.includes(item));
-
-  for (let i = available.length - 1; i > 0; i--) {
+  for (let i = candidates.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [available[i], available[j]] = [available[j], available[i]];
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
   }
 
-  const needed = desiredLength - result.length;
-  return available.slice(0, needed);
+  return candidates.slice(0, desiredLength);
 }
 
 export function makeList(mustInclude, tail) {

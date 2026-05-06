@@ -58,7 +58,7 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   let dataPoints = [radarFullAttributes.map((axis, i) => {
     return { axis: axis[0], value: teamRadarData[i] };
   })];
-  built.radar.update(dataPoints, TRANSITION_TIME)
+  built.radar.update(dataPoints, TRANSITION_TIME, built)
 }
 
 export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId) {

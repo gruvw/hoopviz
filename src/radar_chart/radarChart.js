@@ -83,7 +83,7 @@ export function RadarChart(id, data, options) {
     return radarLine;
   }
 
-  function update(newData, duration) {
+  function update(newData, duration, labelOptions) {
     duration = duration || 0;
     var newMaxValue = Math.max(cfg.maxValue, d3.max(newData, function(i) { return d3.max(i.map(function(o) { return o.value; })) }));
     var allAxis = newData[0].map(function(i, j) { return i.axis });
@@ -198,7 +198,7 @@ export function RadarChart(id, data, options) {
     var htmlLabelsCombined = htmlLabels.merge(htmlLabelsEnter);
 
     htmlLabelsCombined.each(function(d, i) {
-      var content = cfg.axisContent ? cfg.axisContent(d, i) : ("<span>" + d + "</span>");
+      var content = cfg.axisContent ? cfg.axisContent(labelOptions, i) : ("<span>" + d + "</span>");
       var nodeContainer = d3.select(this);
 
       if (content instanceof Node) {
@@ -338,7 +338,7 @@ export function RadarChart(id, data, options) {
       .attr("cy", function(d, i) { return rScale(d.value) * Math.sin(angleSlice * i - Math.PI / 2); });
   }
 
-  update(data);
+  update(data, 0, options);
 
   return {
     update: update
