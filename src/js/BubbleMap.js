@@ -14,7 +14,7 @@ export class BubbleMap {
     this.container = document.querySelector(options.containerSelector);
     this.seasonsLoader = options.seasonsLoader;
     this.containerIdPrefix = `${this.container.id}-`;
-    this.statsUpdate = options.statsUpdate;
+    this.statsUpdate = () => options.statsUpdate(this.stats, this.built, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem);
 
     this.metadataLoader = options.metadataLoader;
     this.bubbleContent = options.bubbleContent;
@@ -55,7 +55,7 @@ export class BubbleMap {
     this.statsItem = null;
     this.currentYear = null;
 
-    this.statsBuilt = options.buildStats(this.stats);
+    this.built = options.build([this.attributeY, this.attributeSize, this.attributeX]);
 
     this.ready = this.init();
   }
@@ -164,7 +164,7 @@ export class BubbleMap {
     this.currentYear = year;
 
     if (this.statsItem != null) {
-        this.statsUpdate(this.stats, this.statsBuilt, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem);
+      this.statsUpdate();
     }
 
     this.updateBubbles();
@@ -280,7 +280,7 @@ export class BubbleMap {
         e.preventDefault();
 
         this.statsItem = item;
-        this.statsUpdate(this.stats, this.statsBuilt, this.seasonsLoader, this.metadataLoader, this.currentYear, item);
+        this.statsUpdate();
 
         this.stats.classList.add("active");
       });
@@ -321,6 +321,7 @@ export class BubbleMap {
               }
             });
 
+            this.built.bubbleMapAttributes = [this.attributeY, this.attributeSize, this.attributeX];
             this.updateSelectors();
             this.updateBubbles();
           });

@@ -7,20 +7,20 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 export function RadarChart(id, data, options) {
   var cfg = {
-    w: 600,				// width
-    h: 600,				// height
+    w: 600,                // width
+    h: 600,                // height
     margin: { top: 20, right: 20, bottom: 20, left: 20 }, // svg margins
-    levels: 3,				// how many levels or inner circles should there be drawn
-    maxValue: 0, 			// what is the value that the biggest circle will represent
-    labelFactor: 1.25, 	// how much farther than the radius of the outer circle should the labels be placed
-    wrapWidth: 60, 		// the number of pixels after which a label needs to be given a new line
-    opacityArea: 0.35, 	// the opacity of the area of the blob
-    dotRadius: 4, 			// the size of the colored circles of each blog
-    opacityCircles: 0.1, 	// the opacity of the circles of each blob
-    strokeWidth: 2, 		// the width of the stroke around each blob
-    roundStrokes: false,	// if true the area and stroke will follow a round path (cardinal-closed)
-    color: [],	// color array
-    axisContent: null		// optional function to render custom HTML for each axis label
+    levels: 3,             // how many levels or inner circles should there be drawn
+    maxValue: 0,           // what is the value that the biggest circle will represent
+    labelFactor: 1.25,     // how much farther than the radius of the outer circle should the labels be placed
+    wrapWidth: 60,         // the number of pixels after which a label needs to be given a new line
+    opacityArea: 0.35,     // the opacity of the area of the blob
+    dotRadius: 4,          // the size of the colored circles of each blog
+    opacityCircles: 0.1,   // the opacity of the circles of each blob
+    strokeWidth: 2,        // the width of the stroke around each blob
+    roundStrokes: false,   // if true the area and stroke will follow a round path (cardinal-closed)
+    color: [],             // color array
+    axisContent: null      // optional function to render custom HTML for each axis label
   };
 
   if ('undefined' !== typeof options) {
@@ -38,12 +38,24 @@ export function RadarChart(id, data, options) {
 
   var container = d3.select(id);
 
+  container.style("position", "relative");
+
   container.select("svg").remove();
+  container.select(".radar-overlay").remove();
 
   var svg = container.append("svg")
     .attr("width", cfg.w + cfg.margin.left + cfg.margin.right)
     .attr("height", cfg.h + cfg.margin.top + cfg.margin.bottom)
     .attr("class", "radar" + id);
+
+  var overlay = container.append("div")
+    .attr("class", "radar-overlay")
+    .style("position", "absolute")
+    .style("top", "0px")
+    .style("left", "0px")
+    // .style("width", (cfg.w + cfg.margin.left + cfg.margin.right) + "px")
+    // .style("height", (cfg.h + cfg.margin.top + cfg.margin.bottom) + "px")
+    .style("pointer-events", "none");
 
   var g = svg.append("g")
     .attr("transform", "translate(" + (cfg.w / 2 + cfg.margin.left) + "," + (cfg.h / 2 + cfg.margin.top) + ")");
@@ -139,38 +151,6 @@ export function RadarChart(id, data, options) {
       .style("stroke", "white")
       .style("stroke-width", "2px");
 
-    axisEnter.append("foreignObject")
-      .attr("class", "axisLabelHtml")
-      .attr("width", 100)
-      .attr("height", 40)
-      .attr("x", function(d, i) {
-        var xPos = rScale(newMaxValue * cfg.labelFactor) * Math.cos(angleSlice * i - Math.PI / 2);
-        return xPos - 50;
-      })
-      .attr("y", function(d, i) {
-        var yPos = rScale(newMaxValue * cfg.labelFactor) * Math.sin(angleSlice * i - Math.PI / 2);
-        return yPos - 20;
-      });
-
-    var foBody = axisEnter.select("foreignObject")
-      .append("xhtml:body")
-      .style("margin", "0")
-      .style("padding", "0")
-      .style("background", "transparent")
-      .style("text-align", "center");
-
-    foBody.each(function(d, i) {
-      var content = cfg.axisContent ? cfg.axisContent(d, i) : ("<span>" + d + "</span>");
-      var container = d3.select(this);
-
-      if (content instanceof Node) {
-        container.html("");
-        container.node().appendChild(content);
-      } else {
-        container.html(content);
-      }
-    });
-
     axis.merge(axisEnter).transition("update").duration(duration)
       .style("opacity", 1);
 
@@ -181,28 +161,64 @@ export function RadarChart(id, data, options) {
       .attr("x2", function(d, i) { return rScale(newMaxValue * 1.1) * Math.cos(angleSlice * i - Math.PI / 2); })
       .attr("y2", function(d, i) { return rScale(newMaxValue * 1.1) * Math.sin(angleSlice * i - Math.PI / 2); });
 
-    axisCombined.select("foreignObject")
-      .transition("update").duration(duration)
-      .attr("x", function(d, i) {
-        var xPos = rScale(newMaxValue * cfg.labelFactor) * Math.cos(angleSlice * i - Math.PI / 2);
-        return xPos - 50;
-      })
-      .attr("y", function(d, i) {
-        var yPos = rScale(newMaxValue * cfg.labelFactor) * Math.sin(angleSlice * i - Math.PI / 2);
-        return yPos - 20;
-      });
+    var htmlLabels = overlay.selectAll(".htmlAxisLabel").data(allAxis);
 
-    axisCombined.select("foreignObject body").each(function(d, i) {
+    htmlLabels.exit()
+      .transition("update").duration(duration)
+      .style("opacity", 0)
+      .remove();
+
+    var htmlLabelsEnter = htmlLabels.enter().append("div")
+      .attr("class", "htmlAxisLabel")
+      .style("position", "absolute")
+      .style("text-align", "center")
+      .style("transform", function(d, i) {
+        var angle = angleSlice * i - Math.PI / 2;
+        var cosValue = Math.cos(angle);
+
+        var xPerc = -50;
+        if (cosValue > 0.1) {
+          xPerc = 0;
+        } else if (cosValue < -0.1) {
+          xPerc = -100;
+        }
+
+        return "translate(" + xPerc + "%, -50%)";
+      })
+      .style("left", function(d, i) {
+        var xPos = rScale(newMaxValue * cfg.labelFactor) * Math.cos(angleSlice * i - Math.PI / 2);
+        return (cfg.w / 2 + cfg.margin.left + xPos) + "px";
+      })
+      .style("top", function(d, i) {
+        var yPos = rScale(newMaxValue * cfg.labelFactor) * Math.sin(angleSlice * i - Math.PI / 2);
+        return (cfg.h / 2 + cfg.margin.top + yPos) + "px";
+      })
+      .style("pointer-events", "auto")
+
+    var htmlLabelsCombined = htmlLabels.merge(htmlLabelsEnter);
+
+    htmlLabelsCombined.each(function(d, i) {
       var content = cfg.axisContent ? cfg.axisContent(d, i) : ("<span>" + d + "</span>");
-      var container = d3.select(this);
+      var nodeContainer = d3.select(this);
 
       if (content instanceof Node) {
-        container.html("");
-        container.node().appendChild(content);
+        nodeContainer.html("");
+        nodeContainer.node().appendChild(content);
       } else {
-        container.html(content);
+        nodeContainer.html(content);
       }
     });
+
+    htmlLabelsCombined.transition("update").duration(duration)
+      .style("opacity", 1)
+      .style("left", function(d, i) {
+        var xPos = rScale(newMaxValue * cfg.labelFactor) * Math.cos(angleSlice * i - Math.PI / 2);
+        return (cfg.w / 2 + cfg.margin.left + xPos) + "px";
+      })
+      .style("top", function(d, i) {
+        var yPos = rScale(newMaxValue * cfg.labelFactor) * Math.sin(angleSlice * i - Math.PI / 2);
+        return (cfg.h / 2 + cfg.margin.top + yPos) + "px";
+      });
 
     var radarAreas = areaLayer.selectAll(".radarArea").data(newData);
 

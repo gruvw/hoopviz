@@ -3,7 +3,10 @@ import { Screens } from "./Screens.js";
 import { SeasonsLoader } from "./SeasonsLoader.js";
 import { MetadataLoader } from "./MetadataLoader.js";
 import { RadarChart } from "../radar_chart/radarChart.js";
+import * as Utils from "./utils.js";
 import * as Stats from "./stats.js";
+
+const RADAR_AXES = 6;
 
 new Screens({
   containerSelector: "#screens",
@@ -19,7 +22,7 @@ new Screens({
     bubbleColor: (row) => "url(https://i.logocdn.com/nba/2024/" + row["teamSlug"] + ".svg)",
     statsUpdate: Stats.updateTeamStats,
     attributes: Stats.TEAM_ATTRIBUTES,
-    buildStats: (statsContainer) => {
+    build: (bubbleMapAttributes) => {
       var margin = { top: 100, right: 100, bottom: 100, left: 100 },
         width = 300,
         height = 300;
@@ -28,20 +31,36 @@ new Screens({
 
       var radarChartOptions = {
         w: width, h: height, margin: margin,
-        maxValue: 1, levels: 5, roundStrokes: true, color: color,
+        maxValue: 1, levels: 4, roundStrokes: true, color: color,
         axisContent: function(axisName, index) {
-          return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">' +
-            // '<span style="font-size:20px;line-height:1;">' + axisIcons[index] + '</span>' +
-            '<span style="font-size:10px;color:#555;white-space:nowrap;">' + axisName + '</span>' +
-            '</div>';
+          var div = document.createElement("div");
+
+          if (index === 0 || index === 1 || index == RADAR_AXES - 1) {
+            div.classList.add("radar-naked-label");
+            div.innerText = axisName;
+          } else {
+            div.classList.add("radar-label");
+            div.innerText = axisName;
+          }
+            div.addEventListener("click", (_) => console.log("HEY"));
+
+          return div;
         }
       };
 
+      let radarInitialAttributes = Utils.listWith(bubbleMapAttributes, Stats.TEAM_ATTRIBUTES, RADAR_AXES);
+      let radarFullAttributes = Utils.makeList(bubbleMapAttributes, radarInitialAttributes);
       let start = [
-          Stats.teamRadarAxes.map((a) => { return { axis: a[0], value: 0 }; })
+        radarFullAttributes.map((a) => { return { axis: a[0], value: 0 }; })
       ];
 
-      return RadarChart("#team-radar", start, radarChartOptions);
+      let radar = RadarChart("#team-radar", start, radarChartOptions);
+
+      return {
+        radar: radar,
+        bubbleMapAttributes: bubbleMapAttributes,
+        radarAttributes: radarInitialAttributes,
+      };
     },
   }),
   // players BubbleMap
@@ -53,10 +72,11 @@ new Screens({
     bubbleColor: (row) => "#005ce6",
     statsUpdate: Stats.updatePlayerStats,
     attributes: Stats.PLAYER_ATTRIBUTES,
-    buildStats: (statsContainer) => {
-      console.log(statsContainer);
+    build: (radarAttributes) => {
       // TODO
-      return null;
+      return {
+        radar: null,
+      };
     },
   }),
 })

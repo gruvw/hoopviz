@@ -271,6 +271,15 @@ section#players:not(.selected) {
     pointer-events: auto;
 }
 
+.stats .radar {
+    transform: scale(0);
+    transition:
+        transform 0.3s ease-in-out;
+}
+.stats.active .radar {
+    transform: scale(1);
+}
+
 #disclaimer {
     position: fixed;
     bottom: 10px;

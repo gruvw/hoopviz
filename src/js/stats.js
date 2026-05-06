@@ -1,4 +1,5 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+import * as Utils from "./utils.js";
 import * as Data from "./data.js";
 
 // TODO set all attributes
@@ -29,9 +30,7 @@ export const PLAYER_ATTRIBUTES = [
 
 export const TRANSITION_TIME = 500;
 
-export let teamRadarAxes = TEAM_ATTRIBUTES.slice(0, 6);
-
-export function updateTeamStats(container, statsBuilt, seasonsLoader, metadataLoader, currentYear, teamId) {
+export function updateTeamStats(container, built, seasonsLoader, metadataLoader, currentYear, teamId) {
   // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");
@@ -52,16 +51,17 @@ export function updateTeamStats(container, statsBuilt, seasonsLoader, metadataLo
 
 
   // radar chart
-  let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...teamRadarAxes.map((a) => a[1])));
-  data = Data.applyData(data, teamRadarAxes.map((_) => Data.min_max_norm_shaper), null);
+  let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
+  let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
+  data = Data.applyData(data, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
   let teamRadarData = data.get(teamId)
-  let dataPoints = [teamRadarAxes.map((axis, i) => {
+  let dataPoints = [radarFullAttributes.map((axis, i) => {
     return { axis: axis[0], value: teamRadarData[i] };
   })];
-  statsBuilt.update(dataPoints, TRANSITION_TIME)
+  built.radar.update(dataPoints, TRANSITION_TIME)
 }
 
-export function updatePlayerStats(container, statsBuilt, seasonsLoader, metadataLoader, currentYear, playerId) {
+export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId) {
   // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");
