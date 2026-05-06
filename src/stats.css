@@ -4,7 +4,7 @@
     align-items: center;
     flex-direction: column;
 
-    background: #91bdff;
+    background: #e0e0e0;
 
     width: 85%;
     height: 80%;
@@ -15,4 +15,82 @@
 
 .stats-close {
   cursor: pointer;
+}
+
+.radar-naked-label {
+    font-weight: bold;
+    width: max-content;
+
+    user-select: none;
+}
+
+.radar-labels {
+    position: relative;
+}
+
+.radar-label {
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+
+    background-color: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+
+    color: white;
+
+    padding: 6px;
+
+    width: max-content;
+
+    user-select: none;
+    cursor: pointer;
+}
+
+.radar-selector {
+    display: none;
+    flex-direction: column;
+
+    gap: 2px;
+    padding: 4px;
+
+    position: absolute;
+    color: white;
+
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+
+    background-color: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+
+    left: 50%;
+    bottom: calc(100% + 2px);
+    transform: translateX(-50%);
+}
+
+.radar-selector > span {
+    display: block;
+    width: 100%;
+    white-space: nowrap;
+
+    padding: 3px 4px;
+    border-radius: 4px;
+
+    user-select: none;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.radar-selector > span.selected {
+    /* font-weight: bold; */
+    background-color: rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.radar-selector > span:not(.selected):not(.disabled):hover {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.radar-selector > span.disabled {
+    pointer-events: auto;
+    cursor: not-allowed;
+    opacity: 0.5;
 }

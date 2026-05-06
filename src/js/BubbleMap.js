@@ -15,7 +15,7 @@ export class BubbleMap {
     this.container = document.querySelector(options.containerSelector);
     this.seasonsLoader = options.seasonsLoader;
     this.containerIdPrefix = `${this.container.id}-`;
-    this.statsUpdate = options.statsUpdate;
+    this.statsUpdate = () => options.statsUpdate(this.stats, this.built, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem);
 
     this.metadataLoader = options.metadataLoader;
     this.bubbleContent = options.bubbleContent;
@@ -56,6 +56,8 @@ export class BubbleMap {
 
     this.statsItem = null;
     this.currentYear = null;
+
+    this.built = options.build([this.attributeY, this.attributeSize, this.attributeX], this.attributes, this.statsUpdate);
 
     this.ready = this.init();
   }
@@ -164,7 +166,7 @@ export class BubbleMap {
     this.currentYear = year;
 
     if (this.statsItem != null) {
-        this.statsUpdate(this.stats, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem);
+      this.statsUpdate();
     }
 
     this.updateBubbles();
@@ -347,7 +349,7 @@ export class BubbleMap {
         e.preventDefault();
 
         this.statsItem = item;
-        this.statsUpdate(this.stats, this.seasonsLoader, this.metadataLoader, this.currentYear, item);
+        this.statsUpdate();
 
         this.stats.classList.add("active");
       });
@@ -387,6 +389,13 @@ export class BubbleMap {
                 setter(randomNewAttr);
               }
             });
+
+            this.built.bubbleMapAttributes = [this.attributeY, this.attributeSize, this.attributeX];
+            this.built.radarAttributes = this.built.radarAttributes.map((a) => this.built.bubbleMapAttributes.includes(a) ? null : a);
+            const missingCount = this.built.radarAttributes.filter(item => item === null).length;
+            const missings = Utils.pickItemsWithout(this.attributes, this.built.radarAttributes.concat(this.built.bubbleMapAttributes), missingCount);
+            var i = 0;
+            this.built.radarAttributes = this.built.radarAttributes.map((a) => a == null ? missings[i++] : a);
 
             this.updateSelectors();
             this.updateBubbles();
@@ -486,6 +495,7 @@ export class BubbleMap {
     });
     this.statsArea.addEventListener("click", (e) => {
       e.stopPropagation();
+      document.querySelectorAll(".radar-selector").forEach(e => e.style.display = "none");
     });
 
     // selectors

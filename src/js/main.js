@@ -18,6 +18,7 @@ new Screens({
     bubbleLogo: (row) => row["teamSlug"],
     statsUpdate: Stats.updateTeamStats,
     attributes: Stats.TEAM_ATTRIBUTES,
+    build: Stats.makeRadarBuild("#team-radar"),
   }),
   // players BubbleMap
   rightBubbleMap: new BubbleMap({
@@ -28,5 +29,6 @@ new Screens({
     bubbleColor: (row) => "#005ce6",
     statsUpdate: Stats.updatePlayerStats,
     attributes: Stats.PLAYER_ATTRIBUTES,
+    build: Stats.makeRadarBuild("#player-radar"),
   }),
 })

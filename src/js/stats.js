@@ -1,5 +1,7 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+import * as Utils from "./utils.js";
 import * as Data from "./data.js";
+import { RadarChart } from "../radar_chart/radarChart.js";
 
 // TODO set all attributes
 
@@ -27,7 +29,98 @@ export const PLAYER_ATTRIBUTES = [
   ["Steals", (r) => parseFloat(r["steals"])],
 ];
 
-export function updateTeamStats(container, seasonsLoader, metadataLoader, currentYear, teamId) {
+export const TRANSITION_TIME = 500;
+const RADAR_AXES = 6;
+
+export function makeRadarBuild(radarId) {
+  return (bubbleMapAttributes, allAttributes, statsUpdate) => {
+    const margin = { top: 100, right: 100, bottom: 100, left: 100 },
+      width = 300,
+      height = 300;
+
+    const color = ["#CC333F"];
+
+    const radarInitialAttributes = Utils.pickItemsWithout(allAttributes, bubbleMapAttributes, RADAR_AXES - bubbleMapAttributes.length);
+
+    const radarChartOptions = {
+      w: width, h: height, margin: margin,
+      maxValue: 1, levels: 4, roundStrokes: true, color: color,
+      allAttributes: allAttributes,
+      bubbleMapAttributes: bubbleMapAttributes,
+      radarAttributes: radarInitialAttributes,
+      axisContent: function(options, index) {
+        const { allAttributes, bubbleMapAttributes, radarAttributes } = options;
+
+        const fullRadar = Utils.makeList(bubbleMapAttributes, radarAttributes);
+        const radarAvailable = Utils.listWithout(allAttributes, bubbleMapAttributes);
+
+        const labelContainer = document.createElement("div");
+
+        if (index === 0 || index === 1 || index == RADAR_AXES - 1) {
+          labelContainer.classList.add("radar-naked-label");
+          labelContainer.innerText = fullRadar[index][0];
+        } else {
+          labelContainer.classList.add("radar-labels");
+
+          const label = document.createElement("div");
+          label.classList.add("radar-label");
+          label.innerText = fullRadar[index][0];
+          labelContainer.appendChild(label)
+
+          const selector = document.createElement("div");
+          selector.classList.add("radar-selector");
+          radarAvailable.forEach(attribute => {
+            const span = document.createElement("span");
+            span.innerText = attribute[0];
+            selector.appendChild(span);
+
+            if (attribute === fullRadar[index]) {
+              span.classList.add("selected");
+            }
+
+            span.addEventListener("click", (_) => {
+              const previous = fullRadar[index];
+              const next = radarAttributes.map((a) => a == previous ? attribute : a);
+              options.radarAttributes = radarAttributes.map((a) => a == previous ? attribute : a == attribute ? Utils.pickItemsWithout(radarAvailable, next.concat([previous]), 1)[0] : a);
+              statsUpdate();
+            });
+          });
+
+          selector.style.display = "none";
+          labelContainer.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (selector.style.display === "none") {
+              document.querySelectorAll(".radar-selector").forEach(e => e.style.display = "none");
+              selector.style.display = "flex";
+            } else {
+              selector.style.display = "none";
+            }
+          });
+
+          labelContainer.appendChild(selector);
+        }
+
+        return labelContainer;
+      }
+    };
+
+    const radarFullAttributes = Utils.makeList(bubbleMapAttributes, radarInitialAttributes);
+    const start = [
+      radarFullAttributes.map((_, i) => { return { axis: i, value: 0 }; })
+    ];
+
+    const radar = RadarChart(radarId, start, radarChartOptions);
+
+    return {
+      radar: radar,
+      allAttributes: allAttributes,
+      bubbleMapAttributes: bubbleMapAttributes,
+      radarAttributes: radarInitialAttributes,
+    };
+  }
+}
+
+export function updateTeamStats(container, built, seasonsLoader, metadataLoader, currentYear, teamId) {
   // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");
@@ -46,24 +139,18 @@ export function updateTeamStats(container, seasonsLoader, metadataLoader, curren
   let teamData = seasonData.get(teamId);
   content.innerText = attributesDisplay.map((display, index) => display + ": " + teamData[index]).join("\n");
 
-  // D3.js example
-  const dataMap = new Map([
-    ["1", [35, 117]], ["2", [43, 114]], ["3", [40, 118]], ["4", [22, 115]]
-  ]);
-  const data = Array.from(dataMap.values()).map(d => d[0]);
-
-  d3.select("#team-chart")
-    .selectAll("rect")
-    .data(data)
-    .join("rect")
-    .attr("x", (_, i) => i * 45 + 10)
-    .attr("y", d => 150 - d)
-    .attr("width", 40)
-    .attr("height", d => d)
-    .attr("fill", "steelblue");
+  // radar chart
+  let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
+  let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
+  data = Data.applyData(data, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
+  let teamRadarData = data.get(teamId)
+  let dataPoints = [radarFullAttributes.map((_, i) => {
+    return { axis: i, value: teamRadarData[i] };
+  })];
+  built.radar.update(dataPoints, TRANSITION_TIME, built)
 }
 
-export function updatePlayerStats(container, seasonsLoader, metadataLoader, currentYear, playerId) {
+export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId) {
   // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");
@@ -82,19 +169,13 @@ export function updatePlayerStats(container, seasonsLoader, metadataLoader, curr
   let playerData = seasonData.get(playerId);
   content.innerText = attributesDisplay.map((display, index) => display + ": " + playerData[index]).join("\n");
 
-  // D3.js example
-  const dataMap = new Map([
-    ["1", [35, 117]], ["2", [43, 114]], ["3", [40, 118]], ["4", [22, 115]]
-  ]);
-  const data = Array.from(dataMap.values()).map(d => d[0]);
-
-  d3.select("#player-chart")
-    .selectAll("rect")
-    .data(data)
-    .join("rect")
-    .attr("x", (_, i) => i * 45 + 10)
-    .attr("y", d => 150 - d)
-    .attr("width", 40)
-    .attr("height", d => d)
-    .attr("fill", "steelblue");
+  // radar chart
+  let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
+  let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
+  data = Data.applyData(data, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
+  let playerRadarData = data.get(playerId)
+  let dataPoints = [radarFullAttributes.map((_, i) => {
+    return { axis: i, value: playerRadarData[i] };
+  })];
+  built.radar.update(dataPoints, TRANSITION_TIME, built)
 }
