@@ -426,6 +426,7 @@ export class BubbleMap {
     });
     this.statsArea.addEventListener("click", (e) => {
       e.stopPropagation();
+      document.querySelectorAll(".radar-selector").forEach(e => e.style.display = "none");
     });
 
     // selectors
