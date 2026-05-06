@@ -6,6 +6,7 @@ export class BubbleMap {
   MAX_ZOOM = 15;
   MIN_ZOOM = 1;
   DRAG_THRESHOLD = 5;
+  LOGO_BUBBLE_SCALE = 1.2;
 
   MAX_RANK_FILTER = 50;
 
@@ -19,6 +20,7 @@ export class BubbleMap {
     this.metadataLoader = options.metadataLoader;
     this.bubbleContent = options.bubbleContent;
     this.bubbleColor = options.bubbleColor;
+    this.bubbleLogo = options.bubbleLogo;
 
     // DOM elements
     this.viewport = this.container.querySelector(".viewport");
@@ -195,17 +197,33 @@ export class BubbleMap {
       Data.min_max_norm_shaper,
     ], null);
 
+    const metaById = new Map();
+    const filteredData = new Map();
+    data.forEach((values, itemId) => {
+      const meta = this.getBubbleMeta(itemId);
+      metaById.set(itemId, meta);
+      if (meta.bubbleContent || meta.bubbleColor || meta.bubbleLogo) {
+        filteredData.set(itemId, values);
+      }
+    });
+    data = filteredData;
+
     const items = [...data.keys()];
     // console.log(JSON.stringify(Object.fromEntries(data)));
 
-    this.createBubbles(items);
+    this.createBubbles(items, metaById);
 
     const positions = {}
     data.forEach((values, itemId) => {
+      const meta = metaById.get(itemId) || {};
+      const isLogo = !!meta.bubbleLogo || (meta.bubbleColor && meta.bubbleColor.includes("url"));
+      const baseSize = values[2] * 0.7 + 0.2;
+      const scaledSize = isLogo ? baseSize * this.LOGO_BUBBLE_SCALE : baseSize;
+
       positions[itemId] = {
         targetX: values[0],
         targetY: values[1],
-        size: values[2] * 0.7 + 0.2,
+        size: scaledSize,
       };
     });
 
@@ -231,7 +249,63 @@ export class BubbleMap {
     });
   }
 
-  createBubbles(items) {
+  getMetaValue(itemId, getter) {
+    if (typeof getter !== "function") return null;
+    return this.metadataLoader.getValueForSeason(itemId, getter, this.currentYear);
+  }
+
+  getBubbleMeta(itemId) {
+    const bubbleContent = this.getMetaValue(itemId, this.bubbleContent);
+    const bubbleColor = this.getMetaValue(itemId, this.bubbleColor);
+    const bubbleLogo = this.getMetaValue(itemId, this.bubbleLogo);
+    return { bubbleContent, bubbleColor, bubbleLogo };
+  }
+
+  getLogoUrl(itemId, bubbleLogo) {
+    const activeTill = this.getMetaValue(itemId, (row) => row["seasonActiveTill"]);
+    const activeTillYear = parseInt(activeTill, 10);
+    const logoYear = Number.isNaN(activeTillYear) ? this.currentYear : activeTillYear;
+    const logoYearSegment = logoYear > 2024 ? "current" : logoYear;
+    return `https://i.logocdn.com/nba/${logoYearSegment}/${bubbleLogo}.svg`;
+  }
+
+  updateBubbleContent(bubble, itemId, meta = null) {
+    const bubbleMeta = meta || this.getBubbleMeta(itemId);
+    const { bubbleContent, bubbleColor, bubbleLogo } = bubbleMeta;
+
+    bubble.classList.remove("bubble-logo");
+    bubble.style.background = "";
+    bubble.textContent = "";
+    bubble.querySelectorAll(".bubble-logo-img").forEach((img) => img.remove());
+
+    if (!bubbleContent && !bubbleColor && !bubbleLogo) {
+      return false;
+    }
+
+    if (bubbleLogo || (bubbleColor && bubbleColor.includes("url"))) {
+      const logoUrl = bubbleLogo
+        ? this.getLogoUrl(itemId, bubbleLogo)
+        : (bubbleColor.match(/url\((['"]?)(.*?)\1\)/)?.[2] || bubbleColor);
+
+      bubble.classList.add("bubble-logo");
+
+      const logo = document.createElement("img");
+      logo.className = "bubble-logo-img";
+      logo.src = logoUrl;
+      logo.alt = bubbleContent || "";
+      logo.decoding = "async";
+      logo.loading = "lazy";
+
+      bubble.appendChild(logo);
+      return true;
+    }
+
+    bubble.textContent = bubbleContent || "";
+    bubble.style.background = bubbleColor || "";
+    return true;
+  }
+
+  createBubbles(items, metaById) {
     const itemsSet = new Set(items);
 
     const existingBubbles = this.bubblesContainer.querySelectorAll(".bubble:not(.measure-bubble)");
@@ -241,6 +315,7 @@ export class BubbleMap {
       const itemId = bubble.id.replace(this.containerIdPrefix, "");
 
       if (itemsSet.has(itemId)) {
+        this.updateBubbleContent(bubble, itemId, metaById?.get(itemId));
         itemsSet.delete(itemId);
         if (bubble.style.getPropertyValue("--visible") === "0") {
           // disable transitioning from past position for ghost bubbles
@@ -265,13 +340,7 @@ export class BubbleMap {
 
       bubble.id = `${this.containerIdPrefix}${item}`;
 
-      const background = this.metadataLoader.getValue(item, this.bubbleColor);
-      if (background.includes("url")) {
-        bubble.style.backgroundImage = background;
-      } else {
-        bubble.textContent = this.metadataLoader.getValue(item, this.bubbleContent);
-        bubble.style.background = background;
-      }
+      this.updateBubbleContent(bubble, item, metaById?.get(item));
 
       bubble.addEventListener("click", (e) => {
         if (this.dragHasMoved) return;

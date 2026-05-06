@@ -218,6 +218,14 @@ section#players:not(.selected) {
     user-select: none;
 }
 
+.bubble-logo-img {
+    width: 85%;
+    height: 85%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
 .bubble.transition {
   transition:
         translate var(--transition-time) ease-in-out,

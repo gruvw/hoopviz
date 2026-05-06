@@ -15,7 +15,7 @@ new Screens({
     seasonsLoader: new SeasonsLoader("./data/team_seasons.csv", (row) => row["teamId"]),
     metadataLoader: new MetadataLoader("./data/team_metadata.csv", (row) => row["teamId"]),
     bubbleContent: (row) => row["teamAbbrev"],
-    bubbleColor: (row) => "url(https://i.logocdn.com/nba/2024/" + row["teamSlug"] + ".svg)",
+    bubbleLogo: (row) => row["teamSlug"],
     statsUpdate: Stats.updateTeamStats,
     attributes: Stats.TEAM_ATTRIBUTES,
   }),
