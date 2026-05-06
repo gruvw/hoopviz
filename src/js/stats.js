@@ -27,7 +27,11 @@ export const PLAYER_ATTRIBUTES = [
   ["Steals", (r) => parseFloat(r["steals"])],
 ];
 
-export function updateTeamStats(container, seasonsLoader, metadataLoader, currentYear, teamId) {
+export const TRANSITION_TIME = 500;
+
+export let teamRadarAxes = TEAM_ATTRIBUTES.slice(0, 6);
+
+export function updateTeamStats(container, statsBuilt, seasonsLoader, metadataLoader, currentYear, teamId) {
   // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");
@@ -46,24 +50,18 @@ export function updateTeamStats(container, seasonsLoader, metadataLoader, curren
   let teamData = seasonData.get(teamId);
   content.innerText = attributesDisplay.map((display, index) => display + ": " + teamData[index]).join("\n");
 
-  // D3.js example
-  const dataMap = new Map([
-    ["1", [35, 117]], ["2", [43, 114]], ["3", [40, 118]], ["4", [22, 115]]
-  ]);
-  const data = Array.from(dataMap.values()).map(d => d[0]);
 
-  d3.select("#team-chart")
-    .selectAll("rect")
-    .data(data)
-    .join("rect")
-    .attr("x", (_, i) => i * 45 + 10)
-    .attr("y", d => 150 - d)
-    .attr("width", 40)
-    .attr("height", d => d)
-    .attr("fill", "steelblue");
+  // radar chart
+  let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...teamRadarAxes.map((a) => a[1])));
+  data = Data.applyData(data, teamRadarAxes.map((_) => Data.min_max_norm_shaper), null);
+  let teamRadarData = data.get(teamId)
+  let dataPoints = [teamRadarAxes.map((axis, i) => {
+    return { axis: axis[0], value: teamRadarData[i] };
+  })];
+  statsBuilt.update(dataPoints, TRANSITION_TIME)
 }
 
-export function updatePlayerStats(container, seasonsLoader, metadataLoader, currentYear, playerId) {
+export function updatePlayerStats(container, statsBuilt, seasonsLoader, metadataLoader, currentYear, playerId) {
   // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");

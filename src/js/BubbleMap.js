@@ -55,6 +55,8 @@ export class BubbleMap {
     this.statsItem = null;
     this.currentYear = null;
 
+    this.statsBuilt = options.buildStats(this.stats);
+
     this.ready = this.init();
   }
 
@@ -162,7 +164,7 @@ export class BubbleMap {
     this.currentYear = year;
 
     if (this.statsItem != null) {
-        this.statsUpdate(this.stats, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem);
+        this.statsUpdate(this.stats, this.statsBuilt, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem);
     }
 
     this.updateBubbles();
@@ -278,7 +280,7 @@ export class BubbleMap {
         e.preventDefault();
 
         this.statsItem = item;
-        this.statsUpdate(this.stats, this.seasonsLoader, this.metadataLoader, this.currentYear, item);
+        this.statsUpdate(this.stats, this.statsBuilt, this.seasonsLoader, this.metadataLoader, this.currentYear, item);
 
         this.stats.classList.add("active");
       });

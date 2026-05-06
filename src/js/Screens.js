@@ -79,9 +79,6 @@ export class Screens {
     // slider
     this.slider.addEventListener("input", () => {
       this.updateThumbLabel();
-      if (this.statsItem != null) {
-        this.statsUpdate(this.stats, this.seasonsLoader, this.slider.value, this.statsItem);
-      }
       this.updateScreens();
     });
 
