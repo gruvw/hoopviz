@@ -349,9 +349,14 @@ export class BubbleMap {
         e.preventDefault();
 
         this.statsItem = item;
-        this.statsUpdate();
-
         this.stats.classList.add("active");
+        this.statsUpdate();
+        requestAnimationFrame(() => this.statsUpdate());
+        setTimeout(() => {
+          if (this.stats.classList.contains("active") && this.statsItem === item) {
+            this.statsUpdate();
+          }
+        }, 350);
       });
 
       this.bubblesContainer.appendChild(bubble);
@@ -492,6 +497,12 @@ export class BubbleMap {
       if (e.target === e.currentTarget) {
         this.closeStats()
       }
+    });
+    this.stats.addEventListener("transitionend", (e) => {
+      if (e.propertyName !== "transform") return;
+      if (!this.stats.classList.contains("active")) return;
+      if (this.statsItem == null) return;
+      this.statsUpdate();
     });
     this.statsArea.addEventListener("click", (e) => {
       e.stopPropagation();

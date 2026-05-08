@@ -20,7 +20,10 @@ export function RadarChart(id, data, options) {
     strokeWidth: 2,        // the width of the stroke around each blob
     roundStrokes: false,   // if true the area and stroke will follow a round path (cardinal-closed)
     color: [],             // color array
-    axisContent: null      // optional function to render custom HTML for each axis label
+    axisContent: null,     // optional function to render custom HTML for each axis label
+    axisLabelFontSize: 10,
+    labelFontSize: 12,
+    tooltipFontSize: 12
   };
 
   if ('undefined' !== typeof options) {
@@ -39,6 +42,7 @@ export function RadarChart(id, data, options) {
   var container = d3.select(id);
 
   container.style("position", "relative");
+  container.style("font-size", cfg.labelFontSize + "px");
 
   container.select("svg").remove();
   container.select(".radar-overlay").remove();
@@ -53,6 +57,7 @@ export function RadarChart(id, data, options) {
     .style("position", "absolute")
     .style("top", "0px")
     .style("left", "0px")
+    .style("font-size", cfg.labelFontSize + "px")
     // .style("width", (cfg.w + cfg.margin.left + cfg.margin.right) + "px")
     // .style("height", (cfg.h + cfg.margin.top + cfg.margin.bottom) + "px")
     .style("pointer-events", "none");
@@ -69,6 +74,7 @@ export function RadarChart(id, data, options) {
 
   var tooltip = tooltipLayer.append("text")
     .attr("class", "tooltip")
+    .style("font-size", cfg.tooltipFontSize + "px")
     .style("opacity", 0);
 
   function getRadialLine(data, maxValue, radius, angleSlice, rScale) {
@@ -124,7 +130,7 @@ export function RadarChart(id, data, options) {
       .attr("x", 4)
       .attr("y", function(d) { return -d * radius / cfg.levels; })
       .attr("dy", "0.4em")
-      .style("font-size", "10px")
+      .style("font-size", cfg.axisLabelFontSize + "px")
       .attr("fill", "#737373");
 
     axisLabels.transition("update").duration(duration)
@@ -172,6 +178,7 @@ export function RadarChart(id, data, options) {
       .attr("class", "htmlAxisLabel")
       .style("position", "absolute")
       .style("text-align", "center")
+      .style("font-size", cfg.labelFontSize + "px")
       .style("transform", function(d, i) {
         var angle = angleSlice * i - Math.PI / 2;
         var cosValue = Math.cos(angle);

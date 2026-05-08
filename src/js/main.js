@@ -7,7 +7,7 @@ import * as Stats from "./stats.js";
 new Screens({
   containerSelector: "#screens",
   screenSelector: "#screen-select",
-  minYear: 1985,
+  minYear: 1990,
   maxYear: 2025,
   // teams BubbleMap
   leftBubbleMap: new BubbleMap({
@@ -18,7 +18,7 @@ new Screens({
     bubbleLogo: (row) => row["teamSlug"],
     statsUpdate: Stats.updateTeamStats,
     attributes: Stats.TEAM_ATTRIBUTES,
-    build: Stats.makeRadarBuild("#team-radar"),
+    build: Stats.makeRadarBuild("#team-radar", { size: 170, margin: 70 }),
   }),
   // players BubbleMap
   rightBubbleMap: new BubbleMap({
@@ -29,6 +29,6 @@ new Screens({
     bubbleColor: (row) => "#005ce6",
     statsUpdate: Stats.updatePlayerStats,
     attributes: Stats.PLAYER_ATTRIBUTES,
-    build: Stats.makeRadarBuild("#player-radar"),
+    build: Stats.makeRadarBuild("#player-radar", { size: 240, margin: 90 }),
   }),
 })
