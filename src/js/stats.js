@@ -149,7 +149,7 @@ function getTeamLogoUrl(metadataLoader, teamId, year) {
   return `https://i.logocdn.com/nba/${logoYearSegment}/${teamSlug}.svg`;
 }
 
-async function updateMatchups(container, currentYear, teamId, metadataLoader) {
+async function updateMatchups(container, currentYear, teamId, metadataLoader, gameType = "Regular Season") {
   const winSlots = container.querySelectorAll(".matchup-card.win .matchup-slot");
   const loseSlots = container.querySelectorAll(".matchup-card.lose .matchup-slot");
 
@@ -171,7 +171,7 @@ async function updateMatchups(container, currentYear, teamId, metadataLoader) {
   const teamRows = rows.filter((row) => {
     return row.season === String(currentYear)
       && row.teamId === String(teamId)
-      && row.gameType === "Regular Season";
+      && row.gameType === gameType;
   });
 
   const winCounts = new Map();
@@ -503,7 +503,7 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
   const teamRows = rows.filter((row) => {
     return row.season === String(currentYear)
       && row.teamId === String(teamId)
-      && row.gameType === "Regular Season";
+      && row.gameType === (built.gameType || "Regular Season");
   });
 
   teamRows.sort((a, b) => {
@@ -900,7 +900,7 @@ export function makeRadarBuild(radarId, options = {}) {
   }
 }
 
-export function updateTeamStats(container, built, seasonsLoader, metadataLoader, currentYear, teamId) {
+export function updateTeamStats(container, built, seasonsLoader, metadataLoader, currentYear, teamId, gameType = "Regular Season") {
   // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");
@@ -1000,14 +1000,15 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
     radarFullAttributes.map((_, i) => ({ axis: i, value: averageRadarData[i] })),
   ];
 
+  built.gameType = gameType;
   built.colors = [colorA, colorB];
   built.radar.update(dataPoints, TRANSITION_TIME, built);
 
   updateEvolutionChart(container, currentYear, teamId, built);
-  updateMatchups(container, currentYear, teamId, metadataLoader);
+  updateMatchups(container, currentYear, teamId, metadataLoader, gameType);
 }
 
-export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId) {
+export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId, gameType = "Regular Season") {
   // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");

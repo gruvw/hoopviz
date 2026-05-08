@@ -15,7 +15,7 @@ export class BubbleMap {
     this.container = document.querySelector(options.containerSelector);
     this.seasonsLoader = options.seasonsLoader;
     this.containerIdPrefix = `${this.container.id}-`;
-    this.statsUpdate = () => options.statsUpdate(this.stats, this.built, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem);
+    this.statsUpdate = () => options.statsUpdate(this.stats, this.built, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem, this.gameType);
 
     this.metadataLoader = options.metadataLoader;
     this.bubbleContent = options.bubbleContent;
@@ -56,6 +56,7 @@ export class BubbleMap {
 
     this.statsItem = null;
     this.currentYear = null;
+    this.gameType = "Regular Season";
 
     this.built = options.build([this.attributeY, this.attributeSize, this.attributeX], this.attributes, this.statsUpdate);
 
@@ -170,6 +171,13 @@ export class BubbleMap {
     }
 
     this.updateBubbles();
+  }
+
+  updateGameType(gameType) {
+    this.gameType = gameType;
+    this.seasonsLoader.setGameType(gameType);
+    this.updateBubbles();
+    if (this.statsItem != null) this.statsUpdate();
   }
 
   updateBubbles() {
