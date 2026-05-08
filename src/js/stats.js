@@ -81,8 +81,33 @@ export function updatePlayerStats(container, seasonsLoader, metadataLoader, curr
   let seasonData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...attributesParse));
 
   let playerData = seasonData.get(playerId);
-  content.innerText = attributesDisplay.map((display, index) => display + ": " + playerData[index]).join("\n");
+  if (playerData) {
+    content.innerText = attributesDisplay.map((display, index) => display + ": " + playerData[index]).join("\n");
+  } else {
+    content.innerText = "No stats available";
+  }
 
   const chartEl = document.getElementById("player-chart");
-  loadShots(playerId, currentYear).then(shots => drawShotChart(chartEl, shots));
+  const loadingSvg = d3.select(chartEl);
+  loadingSvg.selectAll("*").remove();
+  loadingSvg.attr("viewBox", "0 0 601 444").attr("preserveAspectRatio", "xMidYMid meet");
+  loadingSvg.append("image").attr("href", "data/nba-court.svg").attr("width", 601).attr("height", 444);
+  loadingSvg.append("text")
+    .attr("x", 300).attr("y", 222)
+    .attr("text-anchor", "middle")
+    .attr("fill", "#ffffff").attr("font-size", 16)
+    .text("Loading...");
+
+  loadShots(playerId, currentYear).then(shots => {
+    if (shots !== null) drawShotChart(chartEl, shots);
+  }).catch(() => {
+    const svg = d3.select(chartEl);
+    svg.selectAll("*").remove();
+    svg.attr("viewBox", "0 0 601 444").attr("preserveAspectRatio", "xMidYMid meet");
+    svg.append("text")
+      .attr("x", 300).attr("y", 222)
+      .attr("text-anchor", "middle")
+      .attr("fill", "#ffffff").attr("font-size", 16)
+      .text("Failed to load shot data");
+  });
 }

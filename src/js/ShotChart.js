@@ -3,6 +3,8 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 const toSvgX = locX => 218.6 + locX * 0.8684;
 const toSvgY = locY => 89.8 + locY * 0.761;
 
+let _shotRequestId = 0;
+
 export function drawShotChart(svgEl, shots) {
   const svg = d3.select(svgEl);
   svg.selectAll("*").remove();
@@ -15,7 +17,16 @@ export function drawShotChart(svgEl, shots) {
     .attr("width", 601)
     .attr("height", 444);
 
-  const filtered = shots.filter(d => +d.locY <= 470);
+  if (shots.length === 0) {
+    svg.append("text")
+      .attr("x", 300).attr("y", 222)
+      .attr("text-anchor", "middle")
+      .attr("fill", "#ffffff").attr("font-size", 16)
+      .text("No shot data available");
+    return;
+  }
+
+  const filtered = shots.filter(d => isFinite(+d.locX) && isFinite(+d.locY) && +d.locY <= 470);
   const made = filtered.filter(d => +d.shotMade === 1);
   const missed = filtered.filter(d => +d.shotMade === 0);
 
@@ -42,17 +53,19 @@ export function drawShotChart(svgEl, shots) {
 }
 
 export async function loadShots(personId, season) {
+  const requestId = ++_shotRequestId;
   const parts = [
     "data/shot_events_part1.csv",
     "data/shot_events_part2.csv",
     "data/shot_events_part3.csv",
   ];
-  const frames = await Promise.all(parts.map((p, i) =>
-    d3.csv(p)
-  ));
+  let frames;
+  try {
+    frames = await Promise.all(parts.map(p => d3.csv(p)));
+  } catch (e) {
+    throw new Error(`Failed to load shot data: ${e.message}`);
+  }
+  if (requestId !== _shotRequestId) return null;
   const all = frames.flat();
-  console.log(`${personId} ${season}`);
-  const result = all.filter(d => +d.personId === +personId && +d.season === +season);
-  console.log(`shots found: ${result.length}`);
-  return result;
+  return all.filter(d => +d.personId === +personId && +d.season === +season);
 }
