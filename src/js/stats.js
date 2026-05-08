@@ -8,7 +8,7 @@ import { RadarChart } from "../radar_chart/radarChart.js";
 export const TEAM_ATTRIBUTES = [
   // [display name, row to value function]
   ["Wins", (r) => parseFloat(r["win"])],
-  ["Average points", (r) => parseFloat(r["teamScore"])],
+  ["Points", (r) => parseFloat(r["teamScore"])],
   ["Three points %", (r) => parseFloat(r["threePointersPercentage"])],
   ["Assists", (r) => parseFloat(r["assists"])],
   ["Rebounds", (r) => parseFloat(r["rebounds"])],
@@ -68,6 +68,23 @@ function getAttributeByLabel(label) {
 function coerceNumber(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function isColorTooLight(color) {
+  if (!color) return false;
+  const hex = color.trim();
+  if (!hex.startsWith("#")) return false;
+  const full = hex.length === 4
+    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+    : hex;
+  const r = parseInt(full.slice(1, 3), 16);
+  const g = parseInt(full.slice(3, 5), 16);
+  const b = parseInt(full.slice(5, 7), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.85;
+}
+
+function resolveColor(color, fallback) {
+  return (color && !isColorTooLight(color)) ? color : fallback;
 }
 
 function averageArrays(arrays) {
@@ -271,7 +288,7 @@ async function updateMatchups(container, currentYear, teamId, metadataLoader) {
         <div class="matchup-tooltip-row">Record: ${recordLabel}</div>
         <div class="matchup-tooltip-row">Games: ${total}</div>
         <div class="matchup-tooltip-row">${avgScoreLabel}</div>
-        <div class="matchup-tooltip-subtitle">Last 3 games</div>
+        <div class="matchup-tooltip-subtitle">Last games</div>
         ${recentMarkup || "<div class=\"matchup-tooltip-row\">No recent games</div>"}
       `;
       slot.appendChild(logoWrapper);
@@ -398,6 +415,7 @@ function getEvolutionDefaults() {
 function buildEvolutionOptions(select, selectedLabel) {
   select.innerHTML = "";
   TEAM_ATTRIBUTES.forEach(([label]) => {
+    if (label === "Wins" || label === "Salaries (M)") return;
     const option = document.createElement("option");
     option.value = label;
     option.textContent = label;
@@ -559,7 +577,8 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
 
   root.append("g")
     .attr("transform", `translate(0, ${innerHeight})`)
-    .call(d3.axisBottom(xScale).ticks(6).tickFormat((d) => `G${d + 1}`));
+    .call(d3.axisBottom(xScale).ticks(6).tickFormat((d) => `G${d + 1}`))
+    .call((g) => g.select(".domain").remove());
 
   root.append("g")
     .call(d3.axisLeft(yScaleA).ticks(4))
@@ -593,6 +612,18 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
     .attr("stroke", colorB)
     .attr("stroke-width", 2)
     .attr("d", lineB);
+
+  root.append("g")
+    .attr("class", "evolution-win-dots")
+    .selectAll("circle")
+    .data(values)
+    .enter()
+    .append("circle")
+    .attr("cx", (d) => xScale(d.index))
+    .attr("cy", innerHeight)
+    .attr("r", 3)
+    .attr("fill", (d) => Number(d.row.win) === 1 ? "#2e7d32" : "#c62828")
+    .attr("opacity", 0.85);
 
   root.append("text")
     .attr("x", 0)
@@ -935,18 +966,18 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   const legendTeam = container.querySelector(".radar-legend .legend-item.team");
   const legendAverage = container.querySelector(".radar-legend .legend-item.average");
 
-  const colorA = getMetaValue(metadataLoader, teamId, (row) => row["Color1"], currentYear);
-  const colorB = getMetaValue(metadataLoader, teamId, (row) => row["Color2"], currentYear);
+  const rawColorA = getMetaValue(metadataLoader, teamId, (row) => row["Color1"], currentYear);
+  const rawColorB = getMetaValue(metadataLoader, teamId, (row) => row["Color2"], currentYear);
+  const color3 = getMetaValue(metadataLoader, teamId, (row) => row["Color3"], currentYear);
+  const colorA = resolveColor(rawColorA, resolveColor(color3, "#CC333F"));
+  const colorB = resolveColor(rawColorB, resolveColor(color3, "rgba(80, 80, 80, 0.7)"));
   if (legendTeam) {
-    legendTeam.style.color = colorA || "#CC333F";
+    legendTeam.style.color = colorA;
   }
   if (legendAverage) {
-    legendAverage.style.color = colorB || "rgba(80, 80, 80, 0.7)";
+    legendAverage.style.color = colorB;
   }
-  built.evolutionTheme = {
-    colorA: colorA || EVOLUTION_COLOR_A,
-    colorB: colorB || EVOLUTION_COLOR_B,
-  };
+  built.evolutionTheme = { colorA, colorB };
 
   const attributes = TEAM_ATTRIBUTES;
   const attributesParse = attributes.map((a) => a[1]);
@@ -969,8 +1000,7 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
     radarFullAttributes.map((_, i) => ({ axis: i, value: averageRadarData[i] })),
   ];
 
-  const teamColor = getMetaValue(metadataLoader, teamId, (row) => row["Color1"], currentYear);
-  built.colors = [teamColor || "#CC333F", colorB || "rgba(80, 80, 80, 0.45)"];
+  built.colors = [colorA, colorB];
   built.radar.update(dataPoints, TRANSITION_TIME, built);
 
   updateEvolutionChart(container, currentYear, teamId, built);

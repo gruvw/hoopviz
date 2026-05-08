@@ -393,11 +393,11 @@
 }
 
 .matchup-card.win .matchup-slot {
-    border-color: rgba(25, 135, 84, 0.7);
+    border-color: rgb(13, 176, 29);
 }
 
 .matchup-card.lose .matchup-slot {
-    border-color: rgba(220, 53, 69, 0.75);
+    border-color: rgb(215, 31, 31);
 }
 
 .evolution-header {
