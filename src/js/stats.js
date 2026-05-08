@@ -87,6 +87,18 @@ function resolveColor(color, fallback) {
   return (color && !isColorTooLight(color)) ? color : fallback;
 }
 
+function clampTooltip(tooltip, clientX, clientY) {
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const padding = 12;
+  let left = clientX + padding;
+  let top = clientY - tooltipRect.height - padding;
+  if (left + tooltipRect.width > window.innerWidth) left = clientX - tooltipRect.width - padding;
+  if (top < padding) top = clientY + padding;
+  left = Math.max(padding, Math.min(left, window.innerWidth - tooltipRect.width - padding));
+  top = Math.max(padding, Math.min(top, window.innerHeight - tooltipRect.height - padding));
+  tooltip.style.transform = `translate(${left}px, ${top}px)`;
+}
+
 function averageArrays(arrays) {
   if (!arrays || arrays.length === 0) return [];
   const length = arrays[0].length;
@@ -195,7 +207,12 @@ async function updateMatchups(container, currentYear, teamId, metadataLoader, ga
   }
 }
 
+function cleanupPlayoffTooltips() {
+  document.querySelectorAll(".playoff-series-tooltip").forEach((el) => el.remove());
+}
+
 function renderPlayoffRun(statsRight, teamRows, currentYear, metadataLoader) {
+  cleanupPlayoffTooltips();
   const seriesByOpponent = new Map();
   teamRows.forEach((row) => {
     const oppId = row.opponentTeamId;
@@ -288,6 +305,48 @@ function renderPlayoffRun(statsRight, teamRows, currentYear, metadataLoader) {
 
     main.appendChild(info);
     seriesEl.appendChild(main);
+
+    // compute series averages for tooltip
+    const avg = (getter) => {
+      const vals = games.map(getter).filter(Number.isFinite);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    };
+    const fmtNum = (v, decimals = 1) => v != null ? v.toFixed(decimals) : "—";
+    const fmtPct = (v) => v != null ? `${(v * 100).toFixed(1)}%` : "—";
+
+    const avgPts = avg((g) => coerceNumber(g.teamScore));
+    const avgOppPts = avg((g) => coerceNumber(g.opponentScore));
+    const avgAst = avg((g) => coerceNumber(g.assists));
+    const avgReb = avg((g) => coerceNumber(g.rebounds));
+    const avgBlk = avg((g) => coerceNumber(g.blocks));
+    const avgStl = avg((g) => coerceNumber(g.steals));
+    const avgTov = avg((g) => coerceNumber(g.turnovers));
+    const avgFg = avg((g) => coerceNumber(g.fieldGoalsPercentage));
+    const avg3p = avg((g) => coerceNumber(g.threePointersPercentage));
+    const avgFt = avg((g) => coerceNumber(g.freeThrowsPercentage));
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "playoff-series-tooltip";
+    tooltip.innerHTML = `
+      <div class="playoff-tooltip-title">${roundName} vs ${oppName}</div>
+      <div class="playoff-tooltip-score">${fmtNum(avgPts, 1)} &nbsp;—&nbsp; ${fmtNum(avgOppPts, 1)} pts <span style="font-weight:400;font-size:10px">(avg/game)</span></div>
+      <div class="playoff-tooltip-grid">
+        <div class="playoff-tooltip-row"><span class="label">AST</span><span class="value">${fmtNum(avgAst)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">REB</span><span class="value">${fmtNum(avgReb)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">BLK</span><span class="value">${fmtNum(avgBlk)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">STL</span><span class="value">${fmtNum(avgStl)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">TOV</span><span class="value">${fmtNum(avgTov)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">FG%</span><span class="value">${fmtPct(avgFg)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">3P%</span><span class="value">${fmtPct(avg3p)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">FT%</span><span class="value">${fmtPct(avgFt)}</span></div>
+      </div>
+    `;
+    document.body.appendChild(tooltip);
+
+    seriesEl.addEventListener("mouseenter", (e) => { tooltip.style.opacity = "1"; clampTooltip(tooltip, e.clientX, e.clientY); });
+    seriesEl.addEventListener("mousemove", (e) => { clampTooltip(tooltip, e.clientX, e.clientY); });
+    seriesEl.addEventListener("mouseleave", () => { tooltip.style.opacity = "0"; tooltip.style.transform = "translate(-9999px, -9999px)"; });
+
     list.appendChild(seriesEl);
   });
 
@@ -296,6 +355,7 @@ function renderPlayoffRun(statsRight, teamRows, currentYear, metadataLoader) {
 }
 
 function renderRegularMatchups(statsRight, teamRows, currentYear, metadataLoader) {
+  cleanupPlayoffTooltips();
   const winSlots = statsRight.querySelectorAll(".matchup-card.win .matchup-slot");
   const loseSlots = statsRight.querySelectorAll(".matchup-card.lose .matchup-slot");
 
@@ -343,18 +403,6 @@ function renderRegularMatchups(statsRight, teamRows, currentYear, metadataLoader
 
   const topWins = getTopOpponentsByRate(winCounts);
   const topLosses = getTopOpponentsByRate(lossCounts);
-
-  const clampTooltip = (tooltip, clientX, clientY) => {
-    const tooltipRect = tooltip.getBoundingClientRect();
-    const padding = 12;
-    let left = clientX + padding;
-    let top = clientY - tooltipRect.height - padding;
-    if (left + tooltipRect.width > window.innerWidth) left = clientX - tooltipRect.width - padding;
-    if (top < padding) top = clientY + padding;
-    left = Math.max(padding, Math.min(left, window.innerWidth - tooltipRect.width - padding));
-    top = Math.max(padding, Math.min(top, window.innerHeight - tooltipRect.height - padding));
-    tooltip.style.transform = `translate(${left}px, ${top}px)`;
-  };
 
   const fillSlots = (slots, teamIds) => {
     slots.forEach((slot, index) => {
@@ -678,8 +726,9 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
 
   root.append("g")
     .attr("transform", `translate(0, ${innerHeight})`)
-    .call(d3.axisBottom(xScale).ticks(6).tickFormat((d) => `G${d + 1}`))
-    .call((g) => g.select(".domain").remove());
+    .call(d3.axisBottom(xScale).ticks(6).tickFormat((d) => Number.isInteger(d) ? `G${d + 1}` : ""))
+    .call((g) => g.select(".domain").remove())
+    .call((g) => g.selectAll(".tick line").remove());
 
   root.append("g")
     .call(d3.axisLeft(yScaleA).ticks(4))
