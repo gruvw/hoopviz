@@ -52,14 +52,14 @@ const EVOLUTION_COLOR_A = "#2e7d32";
 const EVOLUTION_COLOR_B = "#1e40af";
 const EVOLUTION_TOOLTIP_PADDING = 12;
 const EVOLUTION_DATA_URLS = [
-  "./data/processed/team_games.csv",
-  "../data/processed/team_games.csv",
-  "../../data/processed/team_games.csv",
-  "/data/processed/team_games.csv",
   "./data/team_games.csv",
+];
+const TEAM_SEASON_URLS = [
+  "./data/team_seasons.csv",
 ];
 
 let evolutionDataPromise = null;
+let teamSeasonDataPromise = null;
 
 function getAttributeByLabel(label) {
   return TEAM_ATTRIBUTES.find((attribute) => attribute[0] === label);
@@ -68,6 +68,41 @@ function getAttributeByLabel(label) {
 function coerceNumber(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function averageArrays(arrays) {
+  if (!arrays || arrays.length === 0) return [];
+  const length = arrays[0].length;
+  const sums = new Array(length).fill(0);
+  const counts = new Array(length).fill(0);
+  arrays.forEach((arr) => {
+    arr.forEach((value, index) => {
+      if (Number.isFinite(value)) {
+        sums[index] += value;
+        counts[index] += 1;
+      }
+    });
+  });
+  return sums.map((sum, index) => counts[index] ? sum / counts[index] : 0);
+}
+
+function getRankMap(rows, year, gameType) {
+  const teams = rows
+    .filter((row) => row.season === String(year) && row.gameType === gameType)
+    .map((row) => {
+      const wins = parseFloat(row.win) || 0;
+      const losses = parseFloat(row.losses) || Math.max(0, (parseFloat(row.gamesPlayed) || 0) - wins);
+      const games = wins + losses;
+      const winPct = games ? wins / games : 0;
+      return { teamId: row.teamId, wins, losses, winPct };
+    });
+
+  teams.sort((a, b) => b.winPct - a.winPct || b.wins - a.wins);
+  const rankById = new Map();
+  teams.forEach((team, index) => {
+    rankById.set(team.teamId, { rank: index + 1, wins: team.wins, losses: team.losses });
+  });
+  return rankById;
 }
 
 function formatNumber(value, decimals = 1) {
@@ -85,6 +120,179 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function getTeamLogoUrl(metadataLoader, teamId, year) {
+  const teamSlug = getMetaValue(metadataLoader, teamId, (row) => row["teamSlug"], year);
+  if (!teamSlug) return null;
+  const activeTill = getMetaValue(metadataLoader, teamId, (row) => row["seasonActiveTill"], year);
+  const activeTillYear = parseInt(activeTill, 10);
+  const logoYear = Number.isNaN(activeTillYear) ? year : activeTillYear;
+  const logoYearSegment = logoYear > 2024 ? "current" : logoYear;
+  return `https://i.logocdn.com/nba/${logoYearSegment}/${teamSlug}.svg`;
+}
+
+async function updateMatchups(container, currentYear, teamId, metadataLoader) {
+  const winSlots = container.querySelectorAll(".matchup-card.win .matchup-slot");
+  const loseSlots = container.querySelectorAll(".matchup-card.lose .matchup-slot");
+
+  const clearSlots = (slots) => {
+    slots.forEach((slot) => {
+      slot.innerHTML = "";
+    });
+  };
+
+  let rows = [];
+  try {
+    rows = await loadEvolutionData();
+  } catch (error) {
+    clearSlots(winSlots);
+    clearSlots(loseSlots);
+    return;
+  }
+
+  const teamRows = rows.filter((row) => {
+    return row.season === String(currentYear)
+      && row.teamId === String(teamId)
+      && row.gameType === "Regular Season";
+  });
+
+  const winCounts = new Map();
+  const lossCounts = new Map();
+  const totalCounts = new Map();
+  const opponentNames = new Map();
+  const opponentPointsFor = new Map();
+  const opponentPointsAgainst = new Map();
+  const opponentGames = new Map();
+
+  teamRows.forEach((row) => {
+    const opponentId = row.opponentTeamId;
+    if (!opponentId) return;
+    const isWin = Number(row.win) === 1;
+    const target = isWin ? winCounts : lossCounts;
+    target.set(opponentId, (target.get(opponentId) || 0) + 1);
+    totalCounts.set(opponentId, (totalCounts.get(opponentId) || 0) + 1);
+    const teamScore = coerceNumber(row.teamScore);
+    const opponentScore = coerceNumber(row.opponentScore);
+    if (Number.isFinite(teamScore)) {
+      opponentPointsFor.set(opponentId, (opponentPointsFor.get(opponentId) || 0) + teamScore);
+    }
+    if (Number.isFinite(opponentScore)) {
+      opponentPointsAgainst.set(opponentId, (opponentPointsAgainst.get(opponentId) || 0) + opponentScore);
+    }
+    if (!opponentNames.has(opponentId)) {
+      const name = [row.opponentTeamCity, row.opponentTeamName].filter(Boolean).join(" ");
+      opponentNames.set(opponentId, name || "Opponent");
+    }
+    if (!opponentGames.has(opponentId)) {
+      opponentGames.set(opponentId, []);
+    }
+    opponentGames.get(opponentId).push(row);
+  });
+
+  const getTopOpponentsByRate = (counts) => {
+    return [...counts.entries()]
+      .map(([opponentId, count]) => {
+        const total = totalCounts.get(opponentId) || 0;
+        const rate = total ? count / total : 0;
+        return { opponentId, count, total, rate };
+      })
+      .sort((a, b) => {
+        if (b.rate !== a.rate) return b.rate - a.rate;
+        if (b.total !== a.total) return b.total - a.total;
+        return b.count - a.count;
+      })
+      .slice(0, 4)
+      .map((entry) => entry.opponentId);
+  };
+
+  const topWins = getTopOpponentsByRate(winCounts);
+  const topLosses = getTopOpponentsByRate(lossCounts);
+
+  const clampTooltip = (tooltip, clientX, clientY) => {
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const padding = 12;
+    let left = clientX + padding;
+    let top = clientY - tooltipRect.height - padding;
+    if (left + tooltipRect.width > window.innerWidth) {
+      left = clientX - tooltipRect.width - padding;
+    }
+    if (top < padding) {
+      top = clientY + padding;
+    }
+    left = Math.max(padding, Math.min(left, window.innerWidth - tooltipRect.width - padding));
+    top = Math.max(padding, Math.min(top, window.innerHeight - tooltipRect.height - padding));
+    tooltip.style.transform = `translate(${left}px, ${top}px)`;
+  };
+
+  const fillSlots = (slots, teamIds, mode) => {
+    slots.forEach((slot, index) => {
+      slot.innerHTML = "";
+      const opponentId = teamIds[index];
+      if (!opponentId) return;
+      const logoUrl = getTeamLogoUrl(metadataLoader, opponentId, currentYear);
+      if (!logoUrl) return;
+      const total = totalCounts.get(opponentId) || 0;
+      const wins = winCounts.get(opponentId) || 0;
+      const losses = lossCounts.get(opponentId) || 0;
+      const pointsFor = opponentPointsFor.get(opponentId) || 0;
+      const pointsAgainst = opponentPointsAgainst.get(opponentId) || 0;
+      const avgFor = total ? pointsFor / total : 0;
+      const avgAgainst = total ? pointsAgainst / total : 0;
+      const label = opponentNames.get(opponentId) || "Opponent";
+      const recordLabel = `${wins}-${losses}`;
+      const avgScoreLabel = total
+        ? `Avg score ${formatNumber(avgFor, 1)} - ${formatNumber(avgAgainst, 1)}`
+        : "Avg score N/A";
+      const recentGames = (opponentGames.get(opponentId) || [])
+        .slice()
+        .sort((a, b) => new Date(a.gameDateTimeEst || 0) - new Date(b.gameDateTimeEst || 0))
+        .slice(-3)
+        .reverse();
+      const recentMarkup = recentGames.map((game) => {
+        const date = formatDate(game.gameDateTimeEst);
+        const teamScore = formatNumber(coerceNumber(game.teamScore), 0);
+        const opponentScore = formatNumber(coerceNumber(game.opponentScore), 0);
+        const result = Number(game.win) === 1 ? "W" : "L";
+        return `<div class="matchup-tooltip-row">${date} · ${result} ${teamScore}-${opponentScore}</div>`;
+      }).join("");
+      const img = document.createElement("img");
+      img.src = logoUrl;
+      img.alt = label;
+      img.decoding = "async";
+      img.loading = "lazy";
+      const logoWrapper = document.createElement("div");
+      logoWrapper.className = "matchup-logo";
+      logoWrapper.appendChild(img);
+      const tooltip = document.createElement("div");
+      tooltip.className = "matchup-tooltip";
+      tooltip.innerHTML = `
+        <div class="matchup-tooltip-title">${label}</div>
+        <div class="matchup-tooltip-row">Record: ${recordLabel}</div>
+        <div class="matchup-tooltip-row">Games: ${total}</div>
+        <div class="matchup-tooltip-row">${avgScoreLabel}</div>
+        <div class="matchup-tooltip-subtitle">Last 3 games</div>
+        ${recentMarkup || "<div class=\"matchup-tooltip-row\">No recent games</div>"}
+      `;
+      slot.appendChild(logoWrapper);
+      slot.appendChild(tooltip);
+
+      slot.addEventListener("mouseenter", (event) => {
+        tooltip.style.opacity = "1";
+        clampTooltip(tooltip, event.clientX, event.clientY);
+      });
+      slot.addEventListener("mousemove", (event) => {
+        clampTooltip(tooltip, event.clientX, event.clientY);
+      });
+      slot.addEventListener("mouseleave", () => {
+        tooltip.style.opacity = "0";
+        tooltip.style.transform = "translate(-9999px, -9999px)";
+      });
+    });
+  };
+
+  fillSlots(winSlots, topWins, "win");
+  fillSlots(loseSlots, topLosses, "lose");
 }
 
 async function loadEvolutionData() {
@@ -122,6 +330,43 @@ async function loadEvolutionData() {
     })();
   }
   return evolutionDataPromise;
+}
+
+async function loadTeamSeasonData() {
+  if (!teamSeasonDataPromise) {
+    teamSeasonDataPromise = (async () => {
+      let lastError = null;
+      for (const url of TEAM_SEASON_URLS) {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            lastError = new Error(`Failed to load ${url}: ${response.status}`);
+            continue;
+          }
+          const text = await response.text();
+          const lines = text.trim().split("\n");
+          const headers = lines[0].split(",").map((header) => header.trim());
+          const rows = [];
+
+          for (let i = 1; i < lines.length; i++) {
+            const values = parseCsvLine(lines[i]);
+            const row = {};
+            headers.forEach((header, index) => {
+              row[header] = values[index]?.trim() ?? "";
+            });
+            rows.push(row);
+          }
+
+          return rows;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error("Failed to load team season data");
+    })();
+  }
+  return teamSeasonDataPromise;
 }
 
 function parseCsvLine(line) {
@@ -655,8 +900,49 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
     }
   }
 
+  const rankRegularEl = container.querySelector(".summary-rank-regular");
+  const rankPlayoffsEl = container.querySelector(".summary-rank-playoffs");
+  const cityEl = container.querySelector(".summary-city");
+  const teamEl = container.querySelector(".summary-team");
+
+  if (cityEl) cityEl.textContent = teamCity || "--";
+  if (teamEl) teamEl.textContent = teamName || "--";
+
+  const summaryTargetId = String(teamId);
+  const summaryTargetYear = String(currentYear);
+  loadTeamSeasonData().then((rows) => {
+    if (summaryTargetId !== String(teamId) || summaryTargetYear !== String(currentYear)) return;
+    const regularRanks = getRankMap(rows, currentYear, "Regular Season");
+    const playoffRanks = getRankMap(rows, currentYear, "Playoffs");
+    const regularSummary = regularRanks.get(summaryTargetId);
+    const playoffSummary = playoffRanks.get(summaryTargetId);
+
+    if (rankRegularEl) {
+      rankRegularEl.textContent = regularSummary
+        ? `#${regularSummary.rank} (${regularSummary.wins}-${regularSummary.losses})`
+        : "--";
+    }
+    if (rankPlayoffsEl) {
+      rankPlayoffsEl.textContent = playoffSummary
+        ? `#${playoffSummary.rank} (${playoffSummary.wins}-${playoffSummary.losses})`
+        : "--";
+    }
+  }).catch(() => {
+    if (rankRegularEl) rankRegularEl.textContent = "--";
+    if (rankPlayoffsEl) rankPlayoffsEl.textContent = "--";
+  });
+
+  const legendTeam = container.querySelector(".radar-legend .legend-item.team");
+  const legendAverage = container.querySelector(".radar-legend .legend-item.average");
+
   const colorA = getMetaValue(metadataLoader, teamId, (row) => row["Color1"], currentYear);
   const colorB = getMetaValue(metadataLoader, teamId, (row) => row["Color2"], currentYear);
+  if (legendTeam) {
+    legendTeam.style.color = colorA || "#CC333F";
+  }
+  if (legendAverage) {
+    legendAverage.style.color = colorB || "rgba(80, 80, 80, 0.7)";
+  }
   built.evolutionTheme = {
     colorA: colorA || EVOLUTION_COLOR_A,
     colorB: colorB || EVOLUTION_COLOR_B,
@@ -674,13 +960,21 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
   let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
   data = Data.applyData(data, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
-  let teamRadarData = data.get(teamId)
-  let dataPoints = [radarFullAttributes.map((_, i) => {
-    return { axis: i, value: teamRadarData[i] };
-  })];
-  built.radar.update(dataPoints, TRANSITION_TIME, built)
+  const teamRadarData = data.get(teamId) || [];
+  const allTeamData = Array.from(data.values());
+  const averageRadarData = averageArrays(allTeamData);
+
+  const dataPoints = [
+    radarFullAttributes.map((_, i) => ({ axis: i, value: teamRadarData[i] })),
+    radarFullAttributes.map((_, i) => ({ axis: i, value: averageRadarData[i] })),
+  ];
+
+  const teamColor = getMetaValue(metadataLoader, teamId, (row) => row["Color1"], currentYear);
+  built.colors = [teamColor || "#CC333F", colorB || "rgba(80, 80, 80, 0.45)"];
+  built.radar.update(dataPoints, TRANSITION_TIME, built);
 
   updateEvolutionChart(container, currentYear, teamId, built);
+  updateMatchups(container, currentYear, teamId, metadataLoader);
 }
 
 export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId) {

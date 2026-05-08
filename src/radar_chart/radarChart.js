@@ -103,6 +103,13 @@ export function RadarChart(id, data, options) {
       .domain([0, newMaxValue]);
 
     var radarLine = getRadialLine(newData, newMaxValue, radius, angleSlice, rScale);
+    var color = cfg.color;
+    if (labelOptions && Array.isArray(labelOptions.colors)) {
+      var colorArray = labelOptions.colors;
+      color = function(i) {
+        return colorArray[i % colorArray.length];
+      };
+    }
 
     var axisGrid = gridLayer.selectAll(".axisWrapper").data([null]);
     var axisGridEnter = axisGrid.enter().append("g").attr("class", "axisWrapper");
@@ -237,7 +244,7 @@ export function RadarChart(id, data, options) {
     var radarAreasEnter = radarAreas.enter().append("path")
       .attr("class", "radarArea")
       .style("opacity", 0)
-      .style("fill", function(d, i) { return cfg.color(i); })
+      .style("fill", function(d, i) { return color(i); })
       .style("fill-opacity", cfg.opacityArea)
       .on('mouseover', function(event, d) {
         areaLayer.selectAll(".radarArea").transition("hover").duration(200).style("fill-opacity", 0.1);
@@ -248,6 +255,8 @@ export function RadarChart(id, data, options) {
       });
 
     radarAreas.merge(radarAreasEnter)
+      .style("fill", function(d, i) { return color(i); })
+      .attr("class", function(d, i) { return "radarArea series-" + i; })
       .transition("update").duration(duration)
       .style("opacity", 1)
       .attr("d", function(d, i) { return radarLine(d); });
@@ -263,10 +272,12 @@ export function RadarChart(id, data, options) {
       .attr("class", "radarStroke")
       .style("opacity", 0)
       .style("stroke-width", cfg.strokeWidth + "px")
-      .style("stroke", function(d, i) { return cfg.color(i); })
+      .style("stroke", function(d, i) { return color(i); })
       .style("fill", "none");
 
     radarStrokes.merge(radarStrokesEnter)
+      .style("stroke", function(d, i) { return color(i); })
+      .attr("class", function(d, i) { return "radarStroke series-" + i; })
       .transition("update").duration(duration)
       .style("opacity", 1)
       .attr("d", function(d, i) { return radarLine(d); });
@@ -301,10 +312,12 @@ export function RadarChart(id, data, options) {
       .attr("r", cfg.dotRadius)
       .attr("cx", function(d, i) { return rScale(d.value) * Math.cos(angleSlice * i - Math.PI / 2); })
       .attr("cy", function(d, i) { return rScale(d.value) * Math.sin(angleSlice * i - Math.PI / 2); })
-      .style("fill", function(d) { return cfg.color(d.parentIndex); })
+      .style("fill", function(d) { return color(d.parentIndex); })
       .style("fill-opacity", 0.8);
 
     radarCircles.merge(radarCirclesEnter)
+      .style("fill", function(d) { return color(d.parentIndex); })
+      .attr("class", function(d) { return "radarCircle series-" + d.parentIndex; })
       .transition("update").duration(duration)
       .attr("cx", function(d, i) { return rScale(d.value) * Math.cos(angleSlice * i - Math.PI / 2); })
       .attr("cy", function(d, i) { return rScale(d.value) * Math.sin(angleSlice * i - Math.PI / 2); });
@@ -319,7 +332,11 @@ export function RadarChart(id, data, options) {
     var blobCircleWrapperCombined = blobCircleWrapper.merge(blobCircleWrapperEnter);
 
     var invisibleCircles = blobCircleWrapperCombined.selectAll(".radarInvisibleCircle")
-      .data(function(d, i) { return d; });
+      .data(function(d, i) {
+        return d.map(function(point) {
+          return { ...point, parentIndex: i };
+        });
+      });
 
     invisibleCircles.exit().remove();
 
@@ -342,7 +359,8 @@ export function RadarChart(id, data, options) {
     invisibleCircles.merge(invisibleCirclesEnter)
       .transition("update").duration(duration)
       .attr("cx", function(d, i) { return rScale(d.value) * Math.cos(angleSlice * i - Math.PI / 2); })
-      .attr("cy", function(d, i) { return rScale(d.value) * Math.sin(angleSlice * i - Math.PI / 2); });
+      .attr("cy", function(d, i) { return rScale(d.value) * Math.sin(angleSlice * i - Math.PI / 2); })
+      .attr("class", function(d) { return "radarInvisibleCircle series-" + d.parentIndex; });
   }
 
   update(data, 0, options);
