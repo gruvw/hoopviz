@@ -580,6 +580,118 @@
     }
 }
 
+.playoff-run {
+    grid-row: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+}
+
+.playoff-series-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.playoff-series {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    border-left: 3px solid transparent;
+}
+
+.playoff-series.won {
+    border-left-color: #2e7d32;
+}
+
+.playoff-series.lost {
+    border-left-color: #c62828;
+}
+
+.playoff-round-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #888;
+}
+
+.playoff-series-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.playoff-logo-slot {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.playoff-logo-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.playoff-series-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.playoff-opponent-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #222;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.playoff-series-result {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.playoff-series-result.win  { color: #2e7d32; }
+.playoff-series-result.lose { color: #c62828; }
+
+.playoff-game-dots {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+}
+
+.playoff-game-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    cursor: default;
+}
+
+.playoff-game-dot.win  { background: #2e7d32; }
+.playoff-game-dot.lose { background: #c62828; }
+
+.playoff-no-data {
+    font-size: 12px;
+    color: #888;
+    text-align: center;
+    margin-top: 8px;
+}
+
 .evolution-grid line {
     stroke: rgba(0, 0, 0, 0.1);
     stroke-dasharray: 4 4;

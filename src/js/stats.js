@@ -149,30 +149,155 @@ function getTeamLogoUrl(metadataLoader, teamId, year) {
   return `https://i.logocdn.com/nba/${logoYearSegment}/${teamSlug}.svg`;
 }
 
-async function updateMatchups(container, currentYear, teamId, metadataLoader, gameType = "Regular Season") {
-  const winSlots = container.querySelectorAll(".matchup-card.win .matchup-slot");
-  const loseSlots = container.querySelectorAll(".matchup-card.lose .matchup-slot");
+const REGULAR_MATCHUP_HTML = `
+  <div class="matchup-card win">
+    <div class="matchup-title">Best opponents</div>
+    <div class="matchup-grid">
+      <div class="matchup-slot"></div><div class="matchup-slot"></div>
+      <div class="matchup-slot"></div><div class="matchup-slot"></div>
+    </div>
+  </div>
+  <div class="matchup-card lose">
+    <div class="matchup-title">Worst opponents</div>
+    <div class="matchup-grid">
+      <div class="matchup-slot"></div><div class="matchup-slot"></div>
+      <div class="matchup-slot"></div><div class="matchup-slot"></div>
+    </div>
+  </div>`;
 
-  const clearSlots = (slots) => {
-    slots.forEach((slot) => {
-      slot.innerHTML = "";
-    });
-  };
+const PLAYOFF_ROUND_NAMES = ["First Round", "Conf. Semifinals", "Conf. Finals", "NBA Finals"];
+
+async function updateMatchups(container, currentYear, teamId, metadataLoader, gameType = "Regular Season") {
+  const statsRight = container.querySelector(".stats-right");
+  if (!statsRight) return;
+
+  const targetMode = gameType === "Playoffs" ? "playoff" : "regular";
+  if (statsRight.dataset.mode !== targetMode) {
+    statsRight.dataset.mode = targetMode;
+    statsRight.innerHTML = targetMode === "regular" ? REGULAR_MATCHUP_HTML : "";
+  }
 
   let rows = [];
   try {
     rows = await loadEvolutionData();
-  } catch (error) {
-    clearSlots(winSlots);
-    clearSlots(loseSlots);
+  } catch (_) {
     return;
   }
 
-  const teamRows = rows.filter((row) => {
-    return row.season === String(currentYear)
-      && row.teamId === String(teamId)
-      && row.gameType === gameType;
+  const teamRows = rows.filter(
+    (row) => row.season === String(currentYear) && row.teamId === String(teamId) && row.gameType === gameType
+  );
+
+  if (targetMode === "playoff") {
+    renderPlayoffRun(statsRight, teamRows, currentYear, metadataLoader);
+  } else {
+    renderRegularMatchups(statsRight, teamRows, currentYear, metadataLoader);
+  }
+}
+
+function renderPlayoffRun(statsRight, teamRows, currentYear, metadataLoader) {
+  const seriesByOpponent = new Map();
+  teamRows.forEach((row) => {
+    const oppId = row.opponentTeamId;
+    if (!oppId) return;
+    if (!seriesByOpponent.has(oppId)) seriesByOpponent.set(oppId, []);
+    seriesByOpponent.get(oppId).push(row);
   });
+
+  statsRight.innerHTML = "";
+  const card = document.createElement("div");
+  card.className = "matchup-card playoff-run";
+
+  const title = document.createElement("div");
+  title.className = "matchup-title";
+  title.textContent = "Playoff Run";
+  card.appendChild(title);
+
+  if (seriesByOpponent.size === 0) {
+    const empty = document.createElement("p");
+    empty.className = "playoff-no-data";
+    empty.textContent = "No playoff data for this year";
+    card.appendChild(empty);
+    statsRight.appendChild(card);
+    return;
+  }
+
+  const series = [...seriesByOpponent.entries()].map(([oppId, games]) => {
+    games.sort((a, b) => new Date(a.gameDateTimeEst) - new Date(b.gameDateTimeEst));
+    const wins = games.filter((g) => Number(g.win) === 1).length;
+    const losses = games.length - wins;
+    return { oppId, games, wins, losses, firstDate: games[0].gameDateTimeEst };
+  });
+  series.sort((a, b) => new Date(a.firstDate) - new Date(b.firstDate));
+
+  const list = document.createElement("div");
+  list.className = "playoff-series-list";
+
+  series.forEach(({ oppId, games, wins, losses }, index) => {
+    const roundName = PLAYOFF_ROUND_NAMES[index] || `Round ${index + 1}`;
+    const seriesWon = wins > losses;
+    const oppName = [games[0].opponentTeamCity, games[0].opponentTeamName].filter(Boolean).join(" ");
+    const logoUrl = getTeamLogoUrl(metadataLoader, oppId, currentYear);
+
+    const seriesEl = document.createElement("div");
+    seriesEl.className = `playoff-series ${seriesWon ? "won" : "lost"}`;
+
+    const roundLabel = document.createElement("div");
+    roundLabel.className = "playoff-round-label";
+    roundLabel.textContent = roundName;
+    seriesEl.appendChild(roundLabel);
+
+    const main = document.createElement("div");
+    main.className = "playoff-series-main";
+
+    if (logoUrl) {
+      const logoSlot = document.createElement("div");
+      logoSlot.className = "playoff-logo-slot";
+      const img = document.createElement("img");
+      img.src = logoUrl;
+      img.alt = oppName;
+      img.decoding = "async";
+      img.loading = "lazy";
+      logoSlot.appendChild(img);
+      main.appendChild(logoSlot);
+    }
+
+    const info = document.createElement("div");
+    info.className = "playoff-series-info";
+
+    const nameLine = document.createElement("div");
+    nameLine.className = "playoff-opponent-name";
+    nameLine.textContent = oppName;
+    info.appendChild(nameLine);
+
+    const result = document.createElement("div");
+    result.className = `playoff-series-result ${seriesWon ? "win" : "lose"}`;
+    result.textContent = seriesWon ? `W ${wins}-${losses}` : `L ${wins}-${losses}`;
+    info.appendChild(result);
+
+    const dotsEl = document.createElement("div");
+    dotsEl.className = "playoff-game-dots";
+    games.forEach((game) => {
+      const isWin = Number(game.win) === 1;
+      const dot = document.createElement("span");
+      dot.className = `playoff-game-dot ${isWin ? "win" : "lose"}`;
+      dot.title = `${isWin ? "W" : "L"} ${game.teamScore}-${game.opponentScore}`;
+      dotsEl.appendChild(dot);
+    });
+    info.appendChild(dotsEl);
+
+    main.appendChild(info);
+    seriesEl.appendChild(main);
+    list.appendChild(seriesEl);
+  });
+
+  card.appendChild(list);
+  statsRight.appendChild(card);
+}
+
+function renderRegularMatchups(statsRight, teamRows, currentYear, metadataLoader) {
+  const winSlots = statsRight.querySelectorAll(".matchup-card.win .matchup-slot");
+  const loseSlots = statsRight.querySelectorAll(".matchup-card.lose .matchup-slot");
 
   const winCounts = new Map();
   const lossCounts = new Map();
@@ -201,27 +326,20 @@ async function updateMatchups(container, currentYear, teamId, metadataLoader, ga
       const name = [row.opponentTeamCity, row.opponentTeamName].filter(Boolean).join(" ");
       opponentNames.set(opponentId, name || "Opponent");
     }
-    if (!opponentGames.has(opponentId)) {
-      opponentGames.set(opponentId, []);
-    }
+    if (!opponentGames.has(opponentId)) opponentGames.set(opponentId, []);
     opponentGames.get(opponentId).push(row);
   });
 
-  const getTopOpponentsByRate = (counts) => {
-    return [...counts.entries()]
+  const getTopOpponentsByRate = (counts) =>
+    [...counts.entries()]
       .map(([opponentId, count]) => {
         const total = totalCounts.get(opponentId) || 0;
         const rate = total ? count / total : 0;
         return { opponentId, count, total, rate };
       })
-      .sort((a, b) => {
-        if (b.rate !== a.rate) return b.rate - a.rate;
-        if (b.total !== a.total) return b.total - a.total;
-        return b.count - a.count;
-      })
+      .sort((a, b) => b.rate - a.rate || b.total - a.total || b.count - a.count)
       .slice(0, 4)
-      .map((entry) => entry.opponentId);
-  };
+      .map((e) => e.opponentId);
 
   const topWins = getTopOpponentsByRate(winCounts);
   const topLosses = getTopOpponentsByRate(lossCounts);
@@ -231,18 +349,14 @@ async function updateMatchups(container, currentYear, teamId, metadataLoader, ga
     const padding = 12;
     let left = clientX + padding;
     let top = clientY - tooltipRect.height - padding;
-    if (left + tooltipRect.width > window.innerWidth) {
-      left = clientX - tooltipRect.width - padding;
-    }
-    if (top < padding) {
-      top = clientY + padding;
-    }
+    if (left + tooltipRect.width > window.innerWidth) left = clientX - tooltipRect.width - padding;
+    if (top < padding) top = clientY + padding;
     left = Math.max(padding, Math.min(left, window.innerWidth - tooltipRect.width - padding));
     top = Math.max(padding, Math.min(top, window.innerHeight - tooltipRect.height - padding));
     tooltip.style.transform = `translate(${left}px, ${top}px)`;
   };
 
-  const fillSlots = (slots, teamIds, mode) => {
+  const fillSlots = (slots, teamIds) => {
     slots.forEach((slot, index) => {
       slot.innerHTML = "";
       const opponentId = teamIds[index];
@@ -257,10 +371,6 @@ async function updateMatchups(container, currentYear, teamId, metadataLoader, ga
       const avgFor = total ? pointsFor / total : 0;
       const avgAgainst = total ? pointsAgainst / total : 0;
       const label = opponentNames.get(opponentId) || "Opponent";
-      const recordLabel = `${wins}-${losses}`;
-      const avgScoreLabel = total
-        ? `Avg score ${formatNumber(avgFor, 1)} - ${formatNumber(avgAgainst, 1)}`
-        : "Avg score N/A";
       const recentGames = (opponentGames.get(opponentId) || [])
         .slice()
         .sort((a, b) => new Date(a.gameDateTimeEst || 0) - new Date(b.gameDateTimeEst || 0))
@@ -268,48 +378,39 @@ async function updateMatchups(container, currentYear, teamId, metadataLoader, ga
         .reverse();
       const recentMarkup = recentGames.map((game) => {
         const date = formatDate(game.gameDateTimeEst);
-        const teamScore = formatNumber(coerceNumber(game.teamScore), 0);
-        const opponentScore = formatNumber(coerceNumber(game.opponentScore), 0);
-        const result = Number(game.win) === 1 ? "W" : "L";
-        return `<div class="matchup-tooltip-row">${date} · ${result} ${teamScore}-${opponentScore}</div>`;
+        const ts = formatNumber(coerceNumber(game.teamScore), 0);
+        const os = formatNumber(coerceNumber(game.opponentScore), 0);
+        const r = Number(game.win) === 1 ? "W" : "L";
+        return `<div class="matchup-tooltip-row">${date} · ${r} ${ts}-${os}</div>`;
       }).join("");
+
       const img = document.createElement("img");
-      img.src = logoUrl;
-      img.alt = label;
-      img.decoding = "async";
-      img.loading = "lazy";
+      img.src = logoUrl; img.alt = label; img.decoding = "async"; img.loading = "lazy";
       const logoWrapper = document.createElement("div");
       logoWrapper.className = "matchup-logo";
       logoWrapper.appendChild(img);
+
       const tooltip = document.createElement("div");
       tooltip.className = "matchup-tooltip";
       tooltip.innerHTML = `
         <div class="matchup-tooltip-title">${label}</div>
-        <div class="matchup-tooltip-row">Record: ${recordLabel}</div>
+        <div class="matchup-tooltip-row">Record: ${wins}-${losses}</div>
         <div class="matchup-tooltip-row">Games: ${total}</div>
-        <div class="matchup-tooltip-row">${avgScoreLabel}</div>
+        <div class="matchup-tooltip-row">Avg score ${formatNumber(avgFor, 1)} - ${formatNumber(avgAgainst, 1)}</div>
         <div class="matchup-tooltip-subtitle">Last games</div>
         ${recentMarkup || "<div class=\"matchup-tooltip-row\">No recent games</div>"}
       `;
       slot.appendChild(logoWrapper);
       slot.appendChild(tooltip);
 
-      slot.addEventListener("mouseenter", (event) => {
-        tooltip.style.opacity = "1";
-        clampTooltip(tooltip, event.clientX, event.clientY);
-      });
-      slot.addEventListener("mousemove", (event) => {
-        clampTooltip(tooltip, event.clientX, event.clientY);
-      });
-      slot.addEventListener("mouseleave", () => {
-        tooltip.style.opacity = "0";
-        tooltip.style.transform = "translate(-9999px, -9999px)";
-      });
+      slot.addEventListener("mouseenter", (e) => { tooltip.style.opacity = "1"; clampTooltip(tooltip, e.clientX, e.clientY); });
+      slot.addEventListener("mousemove", (e) => { clampTooltip(tooltip, e.clientX, e.clientY); });
+      slot.addEventListener("mouseleave", () => { tooltip.style.opacity = "0"; tooltip.style.transform = "translate(-9999px, -9999px)"; });
     });
   };
 
-  fillSlots(winSlots, topWins, "win");
-  fillSlots(loseSlots, topLosses, "lose");
+  fillSlots(winSlots, topWins);
+  fillSlots(loseSlots, topLosses);
 }
 
 async function loadEvolutionData() {
