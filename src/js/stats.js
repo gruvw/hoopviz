@@ -1,3 +1,4 @@
+import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { RadarChart } from "./radar_chart/radarChart.js";
 import * as Utils from "./utils.js";
 import * as Data from "./data.js";
