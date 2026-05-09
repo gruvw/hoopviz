@@ -280,39 +280,27 @@ export class BubbleMap {
   }
 
   updateBubbleContent(bubble, itemId, meta = null) {
-    const bubbleMeta = meta || this.getBubbleMeta(itemId);
-    const { bubbleContent, bubbleColor, bubbleLogo } = bubbleMeta;
+    const { bubbleContent, bubbleColor, bubbleLogo } = meta || this.getBubbleMeta(itemId);
 
     bubble.classList.remove("bubble-logo");
     bubble.style.background = "";
     bubble.textContent = "";
     bubble.querySelectorAll(".bubble-logo-img").forEach((img) => img.remove());
 
-    if (!bubbleContent && !bubbleColor && !bubbleLogo) {
-      return false;
-    }
-
-    if (bubbleLogo || (bubbleColor && bubbleColor.includes("url"))) {
-      const logoUrl = bubbleLogo
-        ? this.getLogoUrl(itemId, bubbleLogo)
-        : (bubbleColor.match(/url\((['"]?)(.*?)\1\)/)?.[2] || bubbleColor);
-
+    if (bubbleLogo) {
       bubble.classList.add("bubble-logo");
-
       const logo = document.createElement("img");
       logo.className = "bubble-logo-img";
-      logo.src = logoUrl;
+      logo.src = this.getLogoUrl(itemId, bubbleLogo);
       logo.alt = bubbleContent || "";
       logo.decoding = "async";
       logo.loading = "lazy";
-
       bubble.appendChild(logo);
-      return true;
+      return;
     }
 
     bubble.textContent = bubbleContent || "";
     bubble.style.background = bubbleColor || "";
-    return true;
   }
 
   createBubbles(items, metaById) {
@@ -359,12 +347,6 @@ export class BubbleMap {
         this.statsItem = item;
         this.stats.classList.add("active");
         this.statsUpdate();
-        requestAnimationFrame(() => this.statsUpdate());
-        setTimeout(() => {
-          if (this.stats.classList.contains("active") && this.statsItem === item) {
-            this.statsUpdate();
-          }
-        }, 350);
       });
 
       this.bubblesContainer.appendChild(bubble);

@@ -17,7 +17,6 @@ export const TEAM_ATTRIBUTES = [
   ["Turnovers", (r) => parseFloat(r["turnovers"])],
   ["Fouls", (r) => parseFloat(r["foulsPersonal"])],
   ["Salaries (M)", (r) => parseFloat(r["salary"]) / 1e6],
-  // ["Win %", (r) => parseFloat(r["win"]) / parseFloat(r["gamesPlayed"])],
 ];
 
 export const PLAYER_ATTRIBUTES = [
@@ -36,10 +35,7 @@ export const PLAYER_ATTRIBUTES = [
 ];
 
 function getMetaValue(metadataLoader, id, getter, year) {
-  if (typeof metadataLoader.getValueForSeason === "function") {
-    return metadataLoader.getValueForSeason(id, getter, year);
-  }
-  return metadataLoader.getValue(id, getter);
+  return metadataLoader.getValueForSeason(id, getter, year);
 }
 
 function formatValue(value) {
@@ -51,15 +47,8 @@ const RADAR_AXES = 6;
 const EVOLUTION_COLOR_A = "#2e7d32";
 const EVOLUTION_COLOR_B = "#1e40af";
 const EVOLUTION_TOOLTIP_PADDING = 12;
-const EVOLUTION_DATA_URLS = [
-  "./data/team_games.csv",
-];
-const TEAM_SEASON_URLS = [
-  "./data/team_seasons.csv",
-];
 
-let evolutionDataPromise = null;
-let teamSeasonDataPromise = null;
+const csvCache = new Map();
 
 function getAttributeByLabel(label) {
   return TEAM_ATTRIBUTES.find((attribute) => attribute[0] === label);
@@ -191,7 +180,7 @@ async function updateMatchups(container, currentYear, teamId, metadataLoader, ga
 
   let rows = [];
   try {
-    rows = await loadEvolutionData();
+    rows = await loadCsv("./data/team_games.csv");
   } catch (_) {
     return;
   }
@@ -461,78 +450,23 @@ function renderRegularMatchups(statsRight, teamRows, currentYear, metadataLoader
   fillSlots(loseSlots, topLosses);
 }
 
-async function loadEvolutionData() {
-  if (!evolutionDataPromise) {
-    evolutionDataPromise = (async () => {
-      let lastError = null;
-      for (const url of EVOLUTION_DATA_URLS) {
-        try {
-          const response = await fetch(url);
-          if (!response.ok) {
-            lastError = new Error(`Failed to load ${url}: ${response.status}`);
-            continue;
-          }
-          const text = await response.text();
-          const lines = text.trim().split("\n");
-          const headers = lines[0].split(",").map((header) => header.trim());
-          const rows = [];
-
-          for (let i = 1; i < lines.length; i++) {
-            const values = parseCsvLine(lines[i]);
-            const row = {};
-            headers.forEach((header, index) => {
-              row[header] = values[index]?.trim() ?? "";
-            });
-            rows.push(row);
-          }
-
-          return rows;
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      throw lastError || new Error("Failed to load evolution data");
-    })();
+async function loadCsv(url) {
+  if (!csvCache.has(url)) {
+    csvCache.set(url, (async () => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to load ${url}: ${response.status}`);
+      const text = await response.text();
+      const lines = text.trim().split("\n");
+      const headers = lines[0].split(",").map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const values = parseCsvLine(line);
+        const row = {};
+        headers.forEach((h, i) => { row[h] = values[i]?.trim() ?? ""; });
+        return row;
+      });
+    })());
   }
-  return evolutionDataPromise;
-}
-
-async function loadTeamSeasonData() {
-  if (!teamSeasonDataPromise) {
-    teamSeasonDataPromise = (async () => {
-      let lastError = null;
-      for (const url of TEAM_SEASON_URLS) {
-        try {
-          const response = await fetch(url);
-          if (!response.ok) {
-            lastError = new Error(`Failed to load ${url}: ${response.status}`);
-            continue;
-          }
-          const text = await response.text();
-          const lines = text.trim().split("\n");
-          const headers = lines[0].split(",").map((header) => header.trim());
-          const rows = [];
-
-          for (let i = 1; i < lines.length; i++) {
-            const values = parseCsvLine(lines[i]);
-            const row = {};
-            headers.forEach((header, index) => {
-              row[header] = values[index]?.trim() ?? "";
-            });
-            rows.push(row);
-          }
-
-          return rows;
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      throw lastError || new Error("Failed to load team season data");
-    })();
-  }
-  return teamSeasonDataPromise;
+  return csvCache.get(url);
 }
 
 function parseCsvLine(line) {
@@ -555,12 +489,6 @@ function parseCsvLine(line) {
   return values;
 }
 
-function getEvolutionDefaults() {
-  const primary = TEAM_ATTRIBUTES[1] || TEAM_ATTRIBUTES[0];
-  const secondary = TEAM_ATTRIBUTES[3] || TEAM_ATTRIBUTES[2] || TEAM_ATTRIBUTES[0];
-  return [primary[0], secondary[0]];
-}
-
 function buildEvolutionOptions(select, selectedLabel) {
   select.innerHTML = "";
   TEAM_ATTRIBUTES.forEach(([label]) => {
@@ -575,11 +503,6 @@ function buildEvolutionOptions(select, selectedLabel) {
   });
 }
 
-function selectEvolutionValue(row, attribute) {
-  if (!attribute) return null;
-  return attribute[1](row);
-}
-
 async function updateEvolutionChart(container, currentYear, teamId, built) {
   const chart = container.querySelector("#team-evolution-chart");
   const selectA = container.querySelector(".evolution-select-a");
@@ -588,10 +511,9 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
   if (!chart || !selectA || !selectB) return;
 
   if (!built.evolution) {
-    const [defaultA, defaultB] = getEvolutionDefaults();
     built.evolution = {
-      selectedA: defaultA,
-      selectedB: defaultB,
+      selectedA: TEAM_ATTRIBUTES[1][0],
+      selectedB: TEAM_ATTRIBUTES[3][0],
       resizeObserver: null,
       observeTarget: null,
       resizeScheduled: false,
@@ -633,7 +555,7 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
 
   let rows = [];
   try {
-    rows = await loadEvolutionData();
+    rows = await loadCsv("./data/team_games.csv");
   } catch (error) {
     const svg = d3.select(chart);
     svg.selectAll("*").remove();
@@ -661,15 +583,13 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
     return dateA - dateB;
   });
 
-  const values = teamRows.map((row, index) => {
-    return {
-      index,
-      date: row.gameDateTimeEst,
-      valueA: coerceNumber(selectEvolutionValue(row, attributeA)),
-      valueB: coerceNumber(selectEvolutionValue(row, attributeB)),
-      row,
-    };
-  }).filter((row) => row.valueA != null && row.valueB != null);
+  const values = teamRows.map((row, index) => ({
+    index,
+    date: row.gameDateTimeEst,
+    valueA: attributeA ? coerceNumber(attributeA[1](row)) : null,
+    valueB: attributeB ? coerceNumber(attributeB[1](row)) : null,
+    row,
+  })).filter((row) => row.valueA != null && row.valueB != null);
 
   const evolutionContainer = chart.closest(".evolution") || chart.parentElement;
   if (evolutionContainer && built.evolution.observeTarget !== evolutionContainer) {
@@ -1051,10 +971,6 @@ export function makeRadarBuild(radarId, options = {}) {
 }
 
 export function updateTeamStats(container, built, seasonsLoader, metadataLoader, currentYear, teamId, gameType = "Regular Season") {
-  // example use of the system
-  const name = container.querySelector(".name");
-  const year = container.querySelector(".year");
-  const content = container.querySelector(".content");
   const logo = container.querySelector(".stats-logo");
 
   const teamAbbrev = getMetaValue(metadataLoader, teamId, (row) => row["teamAbbrev"], currentYear);
@@ -1062,9 +978,6 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   const teamCity = seasonsLoader.getData(currentYear, (row) => row["teamCity"]).get(teamId);
   const teamName = seasonsLoader.getData(currentYear, (row) => row["teamName"]).get(teamId);
   const displayName = [teamCity, teamName].filter(Boolean).join(" ");
-
-  // name.innerText = displayName || teamAbbrev || teamId;
-  // year.innerText = currentYear;
 
   if (logo) {
     if (teamSlug) {
@@ -1091,7 +1004,7 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
 
   const summaryTargetId = String(teamId);
   const summaryTargetYear = String(currentYear);
-  loadTeamSeasonData().then((rows) => {
+  loadCsv("./data/team_seasons.csv").then((rows) => {
     if (summaryTargetId !== String(teamId) || summaryTargetYear !== String(currentYear)) return;
     const regularRanks = getRankMap(rows, currentYear, "Regular Season");
     const playoffRanks = getRankMap(rows, currentYear, "Playoffs");
@@ -1128,14 +1041,6 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
     legendAverage.style.color = colorB;
   }
   built.evolutionTheme = { colorA, colorB };
-
-  const attributes = TEAM_ATTRIBUTES;
-  const attributesParse = attributes.map((a) => a[1]);
-  const attributesDisplay = attributes.map((a) => a[0]);
-  const seasonData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...attributesParse));
-
-  const teamData = seasonData.get(teamId) || [];
-  content.innerText = "";
 
   // radar chart
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
