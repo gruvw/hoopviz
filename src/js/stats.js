@@ -964,9 +964,14 @@ export function makeRadarBuild(radarId, options = {}) {
             e.stopPropagation();
             if (selector.style.display === "none") {
               document.querySelectorAll(".radar-selector").forEach(e => e.style.display = "none");
+              document.querySelectorAll(".htmlAxisLabel").forEach(el => el.style.zIndex = "");
               selector.style.display = "flex";
+              const axisLabel = labelContainer.closest(".htmlAxisLabel");
+              if (axisLabel) axisLabel.style.zIndex = "10";
             } else {
               selector.style.display = "none";
+              const axisLabel = labelContainer.closest(".htmlAxisLabel");
+              if (axisLabel) axisLabel.style.zIndex = "";
             }
           });
 
