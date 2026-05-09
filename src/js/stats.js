@@ -489,26 +489,32 @@ function parseCsvLine(line) {
   return values;
 }
 
-function buildEvolutionOptions(select, selectedLabel) {
-  select.innerHTML = "";
-  TEAM_ATTRIBUTES.forEach(([label]) => {
-    if (label === "Wins" || label === "Salaries (M)") return;
-    const option = document.createElement("option");
-    option.value = label;
-    option.textContent = label;
-    if (label === selectedLabel) {
-      option.selected = true;
-    }
-    select.appendChild(option);
+function buildEvolutionSelector(btn, list, selectedLabel, onChange) {
+  const textEl = btn.querySelector(".evo-label-text");
+  if (textEl) textEl.textContent = selectedLabel;
+  list.innerHTML = "";
+  TEAM_ATTRIBUTES.forEach(([attr]) => {
+    if (attr === "Wins" || attr === "Salaries (M)") return;
+    const span = document.createElement("span");
+    span.textContent = attr;
+    if (attr === selectedLabel) span.classList.add("selected");
+    span.addEventListener("click", (e) => {
+      e.stopPropagation();
+      list.style.display = "none";
+      if (attr !== selectedLabel) onChange(attr);
+    });
+    list.appendChild(span);
   });
 }
 
 async function updateEvolutionChart(container, currentYear, teamId, built) {
   const chart = container.querySelector("#team-evolution-chart");
-  const selectA = container.querySelector(".evolution-select-a");
-  const selectB = container.querySelector(".evolution-select-b");
+  const btnA  = container.querySelector(".evo-ctrl-a");
+  const listA = container.querySelector(".evo-selector-a");
+  const btnB  = container.querySelector(".evo-ctrl-b");
+  const listB = container.querySelector(".evo-selector-b");
 
-  if (!chart || !selectA || !selectB) return;
+  if (!chart || !btnA || !listA || !btnB || !listB) return;
 
   if (!built.evolution) {
     built.evolution = {
@@ -520,21 +526,36 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
       tooltipEl: null,
     };
 
-    buildEvolutionOptions(selectA, built.evolution.selectedA);
-    buildEvolutionOptions(selectB, built.evolution.selectedB);
-
-    selectA.addEventListener("change", () => {
-      built.evolution.selectedA = selectA.value;
+    buildEvolutionSelector(btnA, listA, built.evolution.selectedA, (attr) => {
+      built.evolution.selectedA = attr;
+      updateEvolutionChart(container, currentYear, teamId, built);
+    });
+    buildEvolutionSelector(btnB, listB, built.evolution.selectedB, (attr) => {
+      built.evolution.selectedB = attr;
       updateEvolutionChart(container, currentYear, teamId, built);
     });
 
-    selectB.addEventListener("change", () => {
-      built.evolution.selectedB = selectB.value;
-      updateEvolutionChart(container, currentYear, teamId, built);
+    const toggle = (list, other) => (e) => {
+      e.stopPropagation();
+      const open = list.style.display === "flex";
+      other.style.display = "none";
+      list.style.display = open ? "none" : "flex";
+    };
+    btnA.addEventListener("click", toggle(listA, listB));
+    btnB.addEventListener("click", toggle(listB, listA));
+    document.addEventListener("click", () => {
+      listA.style.display = "none";
+      listB.style.display = "none";
     });
   } else {
-    buildEvolutionOptions(selectA, built.evolution.selectedA);
-    buildEvolutionOptions(selectB, built.evolution.selectedB);
+    buildEvolutionSelector(btnA, listA, built.evolution.selectedA, (attr) => {
+      built.evolution.selectedA = attr;
+      updateEvolutionChart(container, currentYear, teamId, built);
+    });
+    buildEvolutionSelector(btnB, listB, built.evolution.selectedB, (attr) => {
+      built.evolution.selectedB = attr;
+      updateEvolutionChart(container, currentYear, teamId, built);
+    });
   }
 
   if (!built.evolution.resizeObserver) {
@@ -699,7 +720,8 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
     .attr("x", 0)
     .attr("y", -6)
     .attr("fill", colorA)
-    .attr("font-size", 12)
+    .attr("font-size", 11)
+    .attr("font-weight", "bold")
     .text(built.evolution.selectedA);
 
   root.append("text")
@@ -707,7 +729,8 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
     .attr("y", -6)
     .attr("text-anchor", "end")
     .attr("fill", colorB)
-    .attr("font-size", 12)
+    .attr("font-size", 11)
+    .attr("font-weight", "bold")
     .text(built.evolution.selectedB);
 
   const focusGroup = root.append("g")

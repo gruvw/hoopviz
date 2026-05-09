@@ -103,12 +103,18 @@
               <div class="evolution-header">
                 <span class="evolution-title">Season evolution</span>
                 <div class="evolution-controls">
-                  <label>
-                    <select class="evolution-select evolution-select-a"></select>
-                  </label>
-                  <label>
-                    <select class="evolution-select evolution-select-b"></select>
-                  </label>
+                  <div class="radar-labels evo-ctrl-wrap">
+                    <div class="radar-label evo-ctrl-btn evo-ctrl-a">
+                      <span class="evo-label-text">Points</span>
+                    </div>
+                    <div class="radar-selector evolution-chart-selector evo-selector-a"></div>
+                  </div>
+                  <div class="radar-labels evo-ctrl-wrap">
+                    <div class="radar-label evo-ctrl-btn evo-ctrl-b">
+                      <span class="evo-label-text">Assists</span>
+                    </div>
+                    <div class="radar-selector evolution-chart-selector evo-selector-b"></div>
+                  </div>
                 </div>
               </div>
               <svg class="evolution-chart" id="team-evolution-chart" width="480" height="180"></svg>
