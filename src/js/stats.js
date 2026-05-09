@@ -48,6 +48,7 @@ const EVOLUTION_COLOR_A = "#2e7d32";
 const EVOLUTION_COLOR_B = "#1e40af";
 const EVOLUTION_TOOLTIP_PADDING = 12;
 
+// stores the in-flight promise, not the resolved data, concurrent callers get the same promise instead of firing duplicate fetches
 const csvCache = new Map();
 
 function getAttributeByLabel(label) {
@@ -63,12 +64,14 @@ function isColorTooLight(color) {
   if (!color) return false;
   const hex = color.trim();
   if (!hex.startsWith("#")) return false;
+  // expand shorthand (#rgb → #rrggbb)
   const full = hex.length === 4
     ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
     : hex;
   const r = parseInt(full.slice(1, 3), 16);
   const g = parseInt(full.slice(3, 5), 16);
   const b = parseInt(full.slice(5, 7), 16);
+  // standard perceived luminance weights, some team colors (e.g. white) would be invisible on a light background
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.85;
 }
 
@@ -109,6 +112,7 @@ function getRankMap(rows, year, gameType) {
     .filter((row) => row.season === String(year) && row.gameType === gameType)
     .map((row) => {
       const wins = parseFloat(row.win) || 0;
+      // some rows don't have a losses column, so derive it from gamesPlayed if needed
       const losses = parseFloat(row.losses) || Math.max(0, (parseFloat(row.gamesPlayed) || 0) - wins);
       const games = wins + losses;
       const winPct = games ? wins / games : 0;
@@ -173,6 +177,7 @@ async function updateMatchups(container, currentYear, teamId, metadataLoader, ga
   if (!statsRight) return;
 
   const targetMode = gameType === "Playoffs" ? "playoff" : "regular";
+  // only rebuild the skeleton when the mode actually changes, avoids wiping the DOM on every stat update
   if (statsRight.dataset.mode !== targetMode) {
     statsRight.dataset.mode = targetMode;
     statsRight.innerHTML = targetMode === "regular" ? REGULAR_MATCHUP_HTML : "";
@@ -334,6 +339,7 @@ function renderPlayoffRun(statsRight, teamRows, currentYear, metadataLoader) {
 
     seriesEl.addEventListener("mouseenter", (e) => { tooltip.style.opacity = "1"; clampTooltip(tooltip, e.clientX, e.clientY); });
     seriesEl.addEventListener("mousemove", (e) => { clampTooltip(tooltip, e.clientX, e.clientY); });
+    // move off-screen too, otherwise the tooltip div blocks mouse events on whatever is underneath it
     seriesEl.addEventListener("mouseleave", () => { tooltip.style.opacity = "0"; tooltip.style.transform = "translate(-9999px, -9999px)"; });
 
     list.appendChild(seriesEl);
@@ -1030,6 +1036,7 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   if (cityEl) cityEl.textContent = teamCity || "--";
   if (teamEl) teamEl.textContent = teamName || "--";
 
+  // snapshot the ids before the async gap so we can bail if the user switched teams in the meantime
   const summaryTargetId = String(teamId);
   const summaryTargetYear = String(currentYear);
   loadCsv("./data/team_seasons.csv").then((rows) => {
@@ -1072,15 +1079,17 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
 
   // radar chart
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
-  let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
-  data = Data.applyData(data, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
+  let rawData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
+  let data = Data.applyData(rawData, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
+  const teamRawData = rawData.get(teamId) || [];
   const teamRadarData = data.get(teamId) || [];
   const allTeamData = Array.from(data.values());
   const averageRadarData = averageArrays(allTeamData);
+  const averageRawData = averageArrays(Array.from(rawData.values()));
 
   const dataPoints = [
-    radarFullAttributes.map((_, i) => ({ axis: i, value: teamRadarData[i] })),
-    radarFullAttributes.map((_, i) => ({ axis: i, value: averageRadarData[i] })),
+    radarFullAttributes.map((attr, i) => ({ axis: i, value: teamRadarData[i], rawValue: teamRawData[i], axisName: attr[0] })),
+    radarFullAttributes.map((attr, i) => ({ axis: i, value: averageRadarData[i], rawValue: averageRawData[i], axisName: attr[0] })),
   ];
 
   built.gameType = gameType;
@@ -1112,11 +1121,12 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
 
   // radar chart
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
-  let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
-  data = Data.applyData(data, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
-  let playerRadarData = data.get(playerId)
-  let dataPoints = [radarFullAttributes.map((_, i) => {
-    return { axis: i, value: playerRadarData[i] };
+  let rawData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
+  let data = Data.applyData(rawData, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
+  const playerRawData = rawData.get(playerId) || [];
+  let playerRadarData = data.get(playerId) || [];
+  let dataPoints = [radarFullAttributes.map((attr, i) => {
+    return { axis: i, value: playerRadarData[i], rawValue: playerRawData[i], axisName: attr[0] };
   })];
   built.radar.update(dataPoints, TRANSITION_TIME, built)
 }

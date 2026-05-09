@@ -86,6 +86,8 @@ export class MetadataLoader {
       }
     }
 
+    // if the entity has season-bounded rows but none matched, the team didn't exist that year
+    // return null rather than a wrong identity. entities without season info fall back to firstMatch.
     if (year != null && hasSeasonInfo) {
       return null;
     }

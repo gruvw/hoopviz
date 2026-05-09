@@ -212,6 +212,7 @@ export class BubbleMap {
     data.forEach((values, itemId) => {
       const meta = this.getBubbleMeta(itemId);
       metaById.set(itemId, meta);
+      // drop entities with no metadata — they'd render as blank invisible bubbles
       if (meta.bubbleContent || meta.bubbleColor || meta.bubbleLogo) {
         filteredData.set(itemId, values);
       }
@@ -274,6 +275,7 @@ export class BubbleMap {
   getLogoUrl(itemId, bubbleLogo) {
     const activeTill = this.getMetaValue(itemId, (row) => row["seasonActiveTill"]);
     const activeTillYear = parseInt(activeTill, 10);
+    // use the last active year for historical logos; logocdn.com uses "current" for anything after 2024
     const logoYear = Number.isNaN(activeTillYear) ? this.currentYear : activeTillYear;
     const logoYearSegment = logoYear > 2024 ? "current" : logoYear;
     return `https://i.logocdn.com/nba/${logoYearSegment}/${bubbleLogo}.svg`;
@@ -488,6 +490,7 @@ export class BubbleMap {
         this.closeStats()
       }
     });
+    // re-render after the slide-in animation so charts have the correct dimensions to draw into
     this.stats.addEventListener("transitionend", (e) => {
       if (e.propertyName !== "transform") return;
       if (!this.stats.classList.contains("active")) return;

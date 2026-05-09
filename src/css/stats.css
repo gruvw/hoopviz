@@ -321,8 +321,8 @@
 }
 
 .matchup-slot {
-    width: 64px;
-    height: 64px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     background: #fff;
     border: 3px dashed rgba(0, 0, 0, 0.35);

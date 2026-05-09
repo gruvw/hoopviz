@@ -77,6 +77,23 @@ export function RadarChart(id, data, options) {
     .style("font-size", cfg.tooltipFontSize + "px")
     .style("opacity", 0);
 
+  function formatTooltipValue(d) {
+    if (d.rawValue === undefined || d.rawValue === null) return d3.format('.0%')(d.value);
+    var name = d.axisName || "";
+    var v = d.rawValue;
+    var formatted;
+    if (name.includes('%')) {
+      formatted = (v * 100).toFixed(1) + '%';
+    } else if (name.includes('Salaries')) {
+      formatted = '$' + v.toFixed(1) + 'M';
+    } else if (Number.isInteger(v) || Math.abs(v - Math.round(v)) < 0.05) {
+      formatted = Math.round(v).toString();
+    } else {
+      formatted = v.toFixed(1);
+    }
+    return name ? name + ': ' + formatted : formatted;
+  }
+
   function getRadialLine(data, maxValue, radius, angleSlice, rScale) {
     var radarLine = d3.lineRadial()
       .radius(function(d) { return rScale(d.value); })
@@ -104,6 +121,7 @@ export function RadarChart(id, data, options) {
 
     var radarLine = getRadialLine(newData, newMaxValue, radius, angleSlice, rScale);
     var color = cfg.color;
+    // allow to pass per-update colors without rebuilding the whole chart
     if (labelOptions && Array.isArray(labelOptions.colors)) {
       var colorArray = labelOptions.colors;
       color = function(i) {
@@ -331,6 +349,7 @@ export function RadarChart(id, data, options) {
 
     var blobCircleWrapperCombined = blobCircleWrapper.merge(blobCircleWrapperEnter);
 
+    // carry the series index into each point so the tooltip can colour-match, without this, `d.parentIndex` is undefined inside the mouseover handler
     var invisibleCircles = blobCircleWrapperCombined.selectAll(".radarInvisibleCircle")
       .data(function(d, i) {
         return d.map(function(point) {
@@ -350,7 +369,8 @@ export function RadarChart(id, data, options) {
       .on("mouseover", function(event, d) {
         var newX = parseFloat(d3.select(this).attr('cx')) - 10;
         var newY = parseFloat(d3.select(this).attr('cy')) - 10;
-        tooltip.attr('x', newX).attr('y', newY).text(Format(d.value)).transition().duration(200).style('opacity', 1);
+        var displayValue = formatTooltipValue(d);
+        tooltip.attr('x', newX).attr('y', newY).text(displayValue).transition().duration(200).style('opacity', 1);
       })
       .on("mouseout", function() {
         tooltip.transition().duration(200).style("opacity", 0);
