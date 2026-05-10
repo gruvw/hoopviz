@@ -22,8 +22,9 @@
 # Data files
 data/*
 data/**/*
-data/games_by_player/*
 !data/**/
 !data/*.md
 !data/processed/*.md
 !data/**/.gitkeep
+
+src/data/games_by_player/*

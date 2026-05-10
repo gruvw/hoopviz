@@ -12,6 +12,9 @@
 
   <link href="style.css" rel="stylesheet">
   <link href="stats.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/cal-heatmap/dist/cal-heatmap.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/cal-heatmap/dist/cal-heatmap.min.js"></script>
   <script type="module" src="js/main.js" defer></script>
 </head>
 
@@ -60,7 +63,7 @@
           <h1 class="name"></h1>
           <h2 class="year"></h2>
           <p class="content"></p>
-          <svg id="team-chart" width="500" height="150" style="border: 1px solid #ccc"></svg>
+
         </div>
       </div>
     </section>
@@ -95,10 +98,31 @@
       <div class="stacked stats">
         <div class="stats-area">
           <span class="stats-close material-symbols-outlined">close</span>
-          <h1 class="name"></h1>
-          <h2 class="year"></h2>
-          <p class="content"></p>
-          <svg id="player-chart" width="400" height="376"></svg>
+          <div class="player-panel">
+            <div class="player-top">
+              <div class="player-image-col">
+                <div class="player-image-placeholder">image</div>
+              </div>
+              <div class="player-stats-col">
+                <h1 class="name"></h1>
+                <div class="player-averages"></div>
+              </div>
+              <div class="player-cal-col">
+                <div id="player-calendar"></div>
+              </div>
+            </div>
+            <div class="player-bottom">
+              <div class="player-bottom-left">
+                <svg id="player-chart"></svg>
+              </div>
+              <div class="player-bottom-center">
+                <span>spider chart</span>
+              </div>
+              <div class="player-bottom-right">
+                <svg id="player-games-chart"></svg>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
