@@ -1,3 +1,4 @@
+import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { RadarChart } from "./radar_chart/radarChart.js";
 import * as Utils from "./utils.js";
 import * as Data from "./data.js";
@@ -7,13 +8,15 @@ import * as Data from "./data.js";
 export const TEAM_ATTRIBUTES = [
   // [display name, row to value function]
   ["Wins", (r) => parseFloat(r["win"])],
-  ["Average points", (r) => parseFloat(r["teamScore"])],
+  ["Points", (r) => parseFloat(r["teamScore"])],
   ["Three points %", (r) => parseFloat(r["threePointersPercentage"])],
   ["Assists", (r) => parseFloat(r["assists"])],
   ["Rebounds", (r) => parseFloat(r["rebounds"])],
   ["Blocks", (r) => parseFloat(r["blocks"])],
   ["Steals", (r) => parseFloat(r["steals"])],
-  // ["Win %", (r) => parseFloat(r["win"]) / parseFloat(r["gamesPlayed"])],
+  ["Turnovers", (r) => parseFloat(r["turnovers"])],
+  ["Fouls", (r) => parseFloat(r["foulsPersonal"])],
+  ["Salaries (M)", (r) => parseFloat(r["salary"]) / 1e6],
 ];
 
 export const PLAYER_ATTRIBUTES = [
@@ -26,24 +29,901 @@ export const PLAYER_ATTRIBUTES = [
   ["Rebounds", (r) => parseFloat(r["rebounds"])],
   ["Blocks", (r) => parseFloat(r["blocks"])],
   ["Steals", (r) => parseFloat(r["steals"])],
+  ["Turnovers", (r) => parseFloat(r["turnovers"])],
+  ["Fouls", (r) => parseFloat(r["foulsPersonal"])],
+  ["Salaries (M)", (r) => parseFloat(r["salary"]) / 1e6],
 ];
+
+function getMetaValue(metadataLoader, id, getter, year) {
+  return metadataLoader.getValueForSeason(id, getter, year);
+}
+
+function formatValue(value) {
+  return Number.isFinite(value) ? value.toFixed(2) : "N/A";
+}
 
 export const TRANSITION_TIME = 500;
 const RADAR_AXES = 6;
+const EVOLUTION_COLOR_A = "#2e7d32";
+const EVOLUTION_COLOR_B = "#1e40af";
+const EVOLUTION_TOOLTIP_PADDING = 12;
 
-export function makeRadarBuild(radarId) {
+// stores the in-flight promise, not the resolved data, concurrent callers get the same promise instead of firing duplicate fetches
+const csvCache = new Map();
+
+function getAttributeByLabel(label) {
+  return TEAM_ATTRIBUTES.find((attribute) => attribute[0] === label);
+}
+
+function coerceNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function isColorTooLight(color) {
+  if (!color) return false;
+  const hex = color.trim();
+  if (!hex.startsWith("#")) return false;
+  // expand shorthand (#rgb → #rrggbb)
+  const full = hex.length === 4
+    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+    : hex;
+  const r = parseInt(full.slice(1, 3), 16);
+  const g = parseInt(full.slice(3, 5), 16);
+  const b = parseInt(full.slice(5, 7), 16);
+  // standard perceived luminance weights, some team colors (e.g. white) would be invisible on a light background
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.85;
+}
+
+function resolveColor(color, fallback) {
+  return (color && !isColorTooLight(color)) ? color : fallback;
+}
+
+function clampTooltip(tooltip, clientX, clientY) {
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const padding = 12;
+  let left = clientX + padding;
+  let top = clientY - tooltipRect.height - padding;
+  if (left + tooltipRect.width > window.innerWidth) left = clientX - tooltipRect.width - padding;
+  if (top < padding) top = clientY + padding;
+  left = Math.max(padding, Math.min(left, window.innerWidth - tooltipRect.width - padding));
+  top = Math.max(padding, Math.min(top, window.innerHeight - tooltipRect.height - padding));
+  tooltip.style.transform = `translate(${left}px, ${top}px)`;
+}
+
+function averageArrays(arrays) {
+  if (!arrays || arrays.length === 0) return [];
+  const length = arrays[0].length;
+  const sums = new Array(length).fill(0);
+  const counts = new Array(length).fill(0);
+  arrays.forEach((arr) => {
+    arr.forEach((value, index) => {
+      if (Number.isFinite(value)) {
+        sums[index] += value;
+        counts[index] += 1;
+      }
+    });
+  });
+  return sums.map((sum, index) => counts[index] ? sum / counts[index] : 0);
+}
+
+function getRankMap(rows, year, gameType) {
+  const teams = rows
+    .filter((row) => row.season === String(year) && row.gameType === gameType)
+    .map((row) => {
+      const wins = parseFloat(row.win) || 0;
+      // some rows don't have a losses column, so derive it from gamesPlayed if needed
+      const losses = parseFloat(row.losses) || Math.max(0, (parseFloat(row.gamesPlayed) || 0) - wins);
+      const games = wins + losses;
+      const winPct = games ? wins / games : 0;
+      return { teamId: row.teamId, wins, losses, winPct };
+    });
+
+  teams.sort((a, b) => b.winPct - a.winPct || b.wins - a.wins);
+  const rankById = new Map();
+  teams.forEach((team, index) => {
+    rankById.set(team.teamId, { rank: index + 1, wins: team.wins, losses: team.losses });
+  });
+  return rankById;
+}
+
+function formatNumber(value, decimals = 1) {
+  if (!Number.isFinite(value)) return "N/A";
+  return value.toFixed(decimals);
+}
+
+function formatPercent(value) {
+  if (!Number.isFinite(value)) return "N/A";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function getTeamLogoUrl(metadataLoader, teamId, year) {
+  const teamSlug = getMetaValue(metadataLoader, teamId, (row) => row["teamSlug"], year);
+  if (!teamSlug) return null;
+  const activeTill = getMetaValue(metadataLoader, teamId, (row) => row["seasonActiveTill"], year);
+  const activeTillYear = parseInt(activeTill, 10);
+  const logoYear = Number.isNaN(activeTillYear) ? year : activeTillYear;
+  const logoYearSegment = logoYear > 2024 ? "current" : logoYear;
+  return `https://i.logocdn.com/nba/${logoYearSegment}/${teamSlug}.svg`;
+}
+
+const REGULAR_MATCHUP_HTML = `
+  <div class="matchup-card win">
+    <div class="matchup-title">Best opponents</div>
+    <div class="matchup-grid">
+      <div class="matchup-slot"></div><div class="matchup-slot"></div>
+      <div class="matchup-slot"></div><div class="matchup-slot"></div>
+    </div>
+  </div>
+  <div class="matchup-card lose">
+    <div class="matchup-title">Worst opponents</div>
+    <div class="matchup-grid">
+      <div class="matchup-slot"></div><div class="matchup-slot"></div>
+      <div class="matchup-slot"></div><div class="matchup-slot"></div>
+    </div>
+  </div>`;
+
+const PLAYOFF_ROUND_NAMES = ["First Round", "Conf. Semifinals", "Conf. Finals", "NBA Finals"];
+
+async function updateMatchups(container, currentYear, teamId, metadataLoader, gameType = "Regular Season") {
+  const statsRight = container.querySelector(".stats-right");
+  if (!statsRight) return;
+
+  const targetMode = gameType === "Playoffs" ? "playoff" : "regular";
+  // only rebuild the skeleton when the mode actually changes, avoids wiping the DOM on every stat update
+  if (statsRight.dataset.mode !== targetMode) {
+    statsRight.dataset.mode = targetMode;
+    statsRight.innerHTML = targetMode === "regular" ? REGULAR_MATCHUP_HTML : "";
+  }
+
+  let rows = [];
+  try {
+    rows = await loadCsv("./data/team_games.csv");
+  } catch (_) {
+    return;
+  }
+
+  const teamRows = rows.filter(
+    (row) => row.season === String(currentYear) && row.teamId === String(teamId) && row.gameType === gameType
+  );
+
+  if (targetMode === "playoff") {
+    renderPlayoffRun(statsRight, teamRows, currentYear, metadataLoader);
+  } else {
+    renderRegularMatchups(statsRight, teamRows, currentYear, metadataLoader);
+  }
+}
+
+function cleanupPlayoffTooltips() {
+  document.querySelectorAll(".playoff-series-tooltip").forEach((el) => el.remove());
+}
+
+function renderPlayoffRun(statsRight, teamRows, currentYear, metadataLoader) {
+  cleanupPlayoffTooltips();
+  const seriesByOpponent = new Map();
+  teamRows.forEach((row) => {
+    const oppId = row.opponentTeamId;
+    if (!oppId) return;
+    if (!seriesByOpponent.has(oppId)) seriesByOpponent.set(oppId, []);
+    seriesByOpponent.get(oppId).push(row);
+  });
+
+  statsRight.innerHTML = "";
+  const card = document.createElement("div");
+  card.className = "matchup-card playoff-run";
+
+  const title = document.createElement("div");
+  title.className = "matchup-title";
+  title.textContent = "Playoff Run";
+  card.appendChild(title);
+
+  if (seriesByOpponent.size === 0) {
+    const empty = document.createElement("p");
+    empty.className = "playoff-no-data";
+    empty.textContent = "No playoff data for this year";
+    card.appendChild(empty);
+    statsRight.appendChild(card);
+    return;
+  }
+
+  const series = [...seriesByOpponent.entries()].map(([oppId, games]) => {
+    games.sort((a, b) => new Date(a.gameDateTimeEst) - new Date(b.gameDateTimeEst));
+    const wins = games.filter((g) => Number(g.win) === 1).length;
+    const losses = games.length - wins;
+    return { oppId, games, wins, losses, firstDate: games[0].gameDateTimeEst };
+  });
+  series.sort((a, b) => new Date(a.firstDate) - new Date(b.firstDate));
+
+  const list = document.createElement("div");
+  list.className = "playoff-series-list";
+
+  series.forEach(({ oppId, games, wins, losses }, index) => {
+    const roundName = PLAYOFF_ROUND_NAMES[index] || `Round ${index + 1}`;
+    const seriesWon = wins > losses;
+    const oppName = [games[0].opponentTeamCity, games[0].opponentTeamName].filter(Boolean).join(" ");
+    const logoUrl = getTeamLogoUrl(metadataLoader, oppId, currentYear);
+
+    const seriesEl = document.createElement("div");
+    seriesEl.className = `playoff-series ${seriesWon ? "won" : "lost"}`;
+
+    const roundLabel = document.createElement("div");
+    roundLabel.className = "playoff-round-label";
+    roundLabel.textContent = roundName;
+    seriesEl.appendChild(roundLabel);
+
+    const main = document.createElement("div");
+    main.className = "playoff-series-main";
+
+    if (logoUrl) {
+      const logoSlot = document.createElement("div");
+      logoSlot.className = "playoff-logo-slot";
+      const img = document.createElement("img");
+      img.src = logoUrl;
+      img.alt = oppName;
+      img.decoding = "async";
+      img.loading = "lazy";
+      logoSlot.appendChild(img);
+      main.appendChild(logoSlot);
+    }
+
+    const info = document.createElement("div");
+    info.className = "playoff-series-info";
+
+    const nameLine = document.createElement("div");
+    nameLine.className = "playoff-opponent-name";
+    nameLine.textContent = oppName;
+    info.appendChild(nameLine);
+
+    const result = document.createElement("div");
+    result.className = `playoff-series-result ${seriesWon ? "win" : "lose"}`;
+    result.textContent = seriesWon ? `W ${wins}-${losses}` : `L ${wins}-${losses}`;
+    info.appendChild(result);
+
+    const dotsEl = document.createElement("div");
+    dotsEl.className = "playoff-game-dots";
+    games.forEach((game) => {
+      const isWin = Number(game.win) === 1;
+      const dot = document.createElement("span");
+      dot.className = `playoff-game-dot ${isWin ? "win" : "lose"}`;
+      dot.title = `${isWin ? "W" : "L"} ${game.teamScore}-${game.opponentScore}`;
+      dotsEl.appendChild(dot);
+    });
+    info.appendChild(dotsEl);
+
+    main.appendChild(info);
+    seriesEl.appendChild(main);
+
+    // compute series averages for tooltip
+    const avg = (getter) => {
+      const vals = games.map(getter).filter(Number.isFinite);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    };
+    const fmtNum = (v, decimals = 1) => v != null ? v.toFixed(decimals) : "—";
+    const fmtPct = (v) => v != null ? `${(v * 100).toFixed(1)}%` : "—";
+
+    const avgPts = avg((g) => coerceNumber(g.teamScore));
+    const avgOppPts = avg((g) => coerceNumber(g.opponentScore));
+    const avgAst = avg((g) => coerceNumber(g.assists));
+    const avgReb = avg((g) => coerceNumber(g.rebounds));
+    const avgBlk = avg((g) => coerceNumber(g.blocks));
+    const avgStl = avg((g) => coerceNumber(g.steals));
+    const avgTov = avg((g) => coerceNumber(g.turnovers));
+    const avgFg = avg((g) => coerceNumber(g.fieldGoalsPercentage));
+    const avg3p = avg((g) => coerceNumber(g.threePointersPercentage));
+    const avgFt = avg((g) => coerceNumber(g.freeThrowsPercentage));
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "playoff-series-tooltip";
+    tooltip.innerHTML = `
+      <div class="playoff-tooltip-title">${roundName} vs ${oppName}</div>
+      <div class="playoff-tooltip-score">${fmtNum(avgPts, 1)} &nbsp;—&nbsp; ${fmtNum(avgOppPts, 1)} pts <span style="font-weight:400;font-size:10px">(avg/game)</span></div>
+      <div class="playoff-tooltip-grid">
+        <div class="playoff-tooltip-row"><span class="label">AST</span><span class="value">${fmtNum(avgAst)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">REB</span><span class="value">${fmtNum(avgReb)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">BLK</span><span class="value">${fmtNum(avgBlk)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">STL</span><span class="value">${fmtNum(avgStl)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">TOV</span><span class="value">${fmtNum(avgTov)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">FG%</span><span class="value">${fmtPct(avgFg)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">3P%</span><span class="value">${fmtPct(avg3p)}</span></div>
+        <div class="playoff-tooltip-row"><span class="label">FT%</span><span class="value">${fmtPct(avgFt)}</span></div>
+      </div>
+    `;
+    document.body.appendChild(tooltip);
+
+    seriesEl.addEventListener("mouseenter", (e) => { tooltip.style.opacity = "1"; clampTooltip(tooltip, e.clientX, e.clientY); });
+    seriesEl.addEventListener("mousemove", (e) => { clampTooltip(tooltip, e.clientX, e.clientY); });
+    // move off-screen too, otherwise the tooltip div blocks mouse events on whatever is underneath it
+    seriesEl.addEventListener("mouseleave", () => { tooltip.style.opacity = "0"; tooltip.style.transform = "translate(-9999px, -9999px)"; });
+
+    list.appendChild(seriesEl);
+  });
+
+  card.appendChild(list);
+  statsRight.appendChild(card);
+}
+
+function renderRegularMatchups(statsRight, teamRows, currentYear, metadataLoader) {
+  cleanupPlayoffTooltips();
+  const winSlots = statsRight.querySelectorAll(".matchup-card.win .matchup-slot");
+  const loseSlots = statsRight.querySelectorAll(".matchup-card.lose .matchup-slot");
+
+  const winCounts = new Map();
+  const lossCounts = new Map();
+  const totalCounts = new Map();
+  const opponentNames = new Map();
+  const opponentPointsFor = new Map();
+  const opponentPointsAgainst = new Map();
+  const opponentGames = new Map();
+
+  teamRows.forEach((row) => {
+    const opponentId = row.opponentTeamId;
+    if (!opponentId) return;
+    const isWin = Number(row.win) === 1;
+    const target = isWin ? winCounts : lossCounts;
+    target.set(opponentId, (target.get(opponentId) || 0) + 1);
+    totalCounts.set(opponentId, (totalCounts.get(opponentId) || 0) + 1);
+    const teamScore = coerceNumber(row.teamScore);
+    const opponentScore = coerceNumber(row.opponentScore);
+    if (Number.isFinite(teamScore)) {
+      opponentPointsFor.set(opponentId, (opponentPointsFor.get(opponentId) || 0) + teamScore);
+    }
+    if (Number.isFinite(opponentScore)) {
+      opponentPointsAgainst.set(opponentId, (opponentPointsAgainst.get(opponentId) || 0) + opponentScore);
+    }
+    if (!opponentNames.has(opponentId)) {
+      const name = [row.opponentTeamCity, row.opponentTeamName].filter(Boolean).join(" ");
+      opponentNames.set(opponentId, name || "Opponent");
+    }
+    if (!opponentGames.has(opponentId)) opponentGames.set(opponentId, []);
+    opponentGames.get(opponentId).push(row);
+  });
+
+  const getTopOpponentsByRate = (counts) =>
+    [...counts.entries()]
+      .map(([opponentId, count]) => {
+        const total = totalCounts.get(opponentId) || 0;
+        const rate = total ? count / total : 0;
+        return { opponentId, count, total, rate };
+      })
+      .sort((a, b) => b.rate - a.rate || b.total - a.total || b.count - a.count)
+      .slice(0, 4)
+      .map((e) => e.opponentId);
+
+  const topWins = getTopOpponentsByRate(winCounts);
+  const topLosses = getTopOpponentsByRate(lossCounts);
+
+  const fillSlots = (slots, teamIds) => {
+    slots.forEach((slot, index) => {
+      slot.innerHTML = "";
+      const opponentId = teamIds[index];
+      if (!opponentId) return;
+      const logoUrl = getTeamLogoUrl(metadataLoader, opponentId, currentYear);
+      if (!logoUrl) return;
+      const total = totalCounts.get(opponentId) || 0;
+      const wins = winCounts.get(opponentId) || 0;
+      const losses = lossCounts.get(opponentId) || 0;
+      const pointsFor = opponentPointsFor.get(opponentId) || 0;
+      const pointsAgainst = opponentPointsAgainst.get(opponentId) || 0;
+      const avgFor = total ? pointsFor / total : 0;
+      const avgAgainst = total ? pointsAgainst / total : 0;
+      const label = opponentNames.get(opponentId) || "Opponent";
+      const recentGames = (opponentGames.get(opponentId) || [])
+        .slice()
+        .sort((a, b) => new Date(a.gameDateTimeEst || 0) - new Date(b.gameDateTimeEst || 0))
+        .slice(-3)
+        .reverse();
+      const recentMarkup = recentGames.map((game) => {
+        const date = formatDate(game.gameDateTimeEst);
+        const ts = formatNumber(coerceNumber(game.teamScore), 0);
+        const os = formatNumber(coerceNumber(game.opponentScore), 0);
+        const r = Number(game.win) === 1 ? "W" : "L";
+        return `<div class="matchup-tooltip-row">${date} · ${r} ${ts}-${os}</div>`;
+      }).join("");
+
+      const img = document.createElement("img");
+      img.src = logoUrl; img.alt = label; img.decoding = "async"; img.loading = "lazy";
+      const logoWrapper = document.createElement("div");
+      logoWrapper.className = "matchup-logo";
+      logoWrapper.appendChild(img);
+
+      const tooltip = document.createElement("div");
+      tooltip.className = "matchup-tooltip";
+      tooltip.innerHTML = `
+        <div class="matchup-tooltip-title">${label}</div>
+        <div class="matchup-tooltip-row">Record: ${wins}-${losses}</div>
+        <div class="matchup-tooltip-row">Games: ${total}</div>
+        <div class="matchup-tooltip-row">Avg score ${formatNumber(avgFor, 1)} - ${formatNumber(avgAgainst, 1)}</div>
+        <div class="matchup-tooltip-subtitle">Last games</div>
+        ${recentMarkup || "<div class=\"matchup-tooltip-row\">No recent games</div>"}
+      `;
+      slot.appendChild(logoWrapper);
+      slot.appendChild(tooltip);
+
+      slot.addEventListener("mouseenter", (e) => { tooltip.style.opacity = "1"; clampTooltip(tooltip, e.clientX, e.clientY); });
+      slot.addEventListener("mousemove", (e) => { clampTooltip(tooltip, e.clientX, e.clientY); });
+      slot.addEventListener("mouseleave", () => { tooltip.style.opacity = "0"; tooltip.style.transform = "translate(-9999px, -9999px)"; });
+    });
+  };
+
+  fillSlots(winSlots, topWins);
+  fillSlots(loseSlots, topLosses);
+}
+
+async function loadCsv(url) {
+  if (!csvCache.has(url)) {
+    csvCache.set(url, (async () => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to load ${url}: ${response.status}`);
+      const text = await response.text();
+      const lines = text.trim().split("\n");
+      const headers = lines[0].split(",").map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const values = parseCsvLine(line);
+        const row = {};
+        headers.forEach((h, i) => { row[h] = values[i]?.trim() ?? ""; });
+        return row;
+      });
+    })());
+  }
+  return csvCache.get(url);
+}
+
+function parseCsvLine(line) {
+  const values = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      values.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  values.push(current);
+  return values;
+}
+
+function buildEvolutionSelector(btn, list, selectedLabel, onChange) {
+  const textEl = btn.querySelector(".evo-label-text");
+  if (textEl) textEl.textContent = selectedLabel;
+  list.innerHTML = "";
+  TEAM_ATTRIBUTES.forEach(([attr]) => {
+    if (attr === "Wins" || attr === "Salaries (M)") return;
+    const span = document.createElement("span");
+    span.textContent = attr;
+    if (attr === selectedLabel) span.classList.add("selected");
+    span.addEventListener("click", (e) => {
+      e.stopPropagation();
+      list.style.display = "none";
+      if (attr !== selectedLabel) onChange(attr);
+    });
+    list.appendChild(span);
+  });
+}
+
+async function updateEvolutionChart(container, currentYear, teamId, built) {
+  const chart = container.querySelector("#team-evolution-chart");
+  const btnA  = container.querySelector(".evo-ctrl-a");
+  const listA = container.querySelector(".evo-selector-a");
+  const btnB  = container.querySelector(".evo-ctrl-b");
+  const listB = container.querySelector(".evo-selector-b");
+
+  if (!chart || !btnA || !listA || !btnB || !listB) return;
+
+  if (!built.evolution) {
+    built.evolution = {
+      selectedA: TEAM_ATTRIBUTES[1][0],
+      selectedB: TEAM_ATTRIBUTES[3][0],
+      resizeObserver: null,
+      observeTarget: null,
+      resizeScheduled: false,
+      tooltipEl: null,
+    };
+
+    buildEvolutionSelector(btnA, listA, built.evolution.selectedA, (attr) => {
+      built.evolution.selectedA = attr;
+      updateEvolutionChart(container, currentYear, teamId, built);
+    });
+    buildEvolutionSelector(btnB, listB, built.evolution.selectedB, (attr) => {
+      built.evolution.selectedB = attr;
+      updateEvolutionChart(container, currentYear, teamId, built);
+    });
+
+    const toggle = (list, other) => (e) => {
+      e.stopPropagation();
+      const open = list.style.display === "flex";
+      other.style.display = "none";
+      list.style.display = open ? "none" : "flex";
+    };
+    btnA.addEventListener("click", toggle(listA, listB));
+    btnB.addEventListener("click", toggle(listB, listA));
+    document.addEventListener("click", () => {
+      listA.style.display = "none";
+      listB.style.display = "none";
+    });
+  } else {
+    buildEvolutionSelector(btnA, listA, built.evolution.selectedA, (attr) => {
+      built.evolution.selectedA = attr;
+      updateEvolutionChart(container, currentYear, teamId, built);
+    });
+    buildEvolutionSelector(btnB, listB, built.evolution.selectedB, (attr) => {
+      built.evolution.selectedB = attr;
+      updateEvolutionChart(container, currentYear, teamId, built);
+    });
+  }
+
+  if (!built.evolution.resizeObserver) {
+    built.evolution.resizeObserver = new ResizeObserver(() => {
+      if (built.evolution.resizeScheduled) return;
+      built.evolution.resizeScheduled = true;
+      requestAnimationFrame(() => {
+        built.evolution.resizeScheduled = false;
+        updateEvolutionChart(container, currentYear, teamId, built);
+      });
+    });
+  }
+
+  const attributeA = getAttributeByLabel(built.evolution.selectedA);
+  const attributeB = getAttributeByLabel(built.evolution.selectedB);
+  const colorA = built.evolutionTheme?.colorA || EVOLUTION_COLOR_A;
+  const colorB = built.evolutionTheme?.colorB || EVOLUTION_COLOR_B;
+
+  let rows = [];
+  try {
+    rows = await loadCsv("./data/team_games.csv");
+  } catch (error) {
+    const svg = d3.select(chart);
+    svg.selectAll("*").remove();
+    const width = parseFloat(chart.getAttribute("width")) || 560;
+    const height = parseFloat(chart.getAttribute("height")) || 220;
+    svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", height / 2)
+      .attr("text-anchor", "middle")
+      .attr("fill", "#666")
+      .attr("font-size", 12)
+      .text("Season evolution data unavailable");
+    return;
+  }
+
+  const teamRows = rows.filter((row) => {
+    return row.season === String(currentYear)
+      && row.teamId === String(teamId)
+      && row.gameType === (built.gameType || "Regular Season");
+  });
+
+  teamRows.sort((a, b) => {
+    const dateA = new Date(a.gameDateTimeEst || 0).getTime();
+    const dateB = new Date(b.gameDateTimeEst || 0).getTime();
+    return dateA - dateB;
+  });
+
+  const values = teamRows.map((row, index) => ({
+    index,
+    date: row.gameDateTimeEst,
+    valueA: attributeA ? coerceNumber(attributeA[1](row)) : null,
+    valueB: attributeB ? coerceNumber(attributeB[1](row)) : null,
+    row,
+  })).filter((row) => row.valueA != null && row.valueB != null);
+
+  const evolutionContainer = chart.closest(".evolution") || chart.parentElement;
+  if (evolutionContainer && built.evolution.observeTarget !== evolutionContainer) {
+    if (built.evolution.observeTarget) {
+      built.evolution.resizeObserver.unobserve(built.evolution.observeTarget);
+    }
+    built.evolution.resizeObserver.observe(evolutionContainer);
+    built.evolution.observeTarget = evolutionContainer;
+  }
+
+  const { width, height } = chart.getBoundingClientRect();
+  if (width < 10 || height < 10) {
+    return;
+  }
+  const margin = { top: 18, right: 70, bottom: 40, left: 70 };
+  const innerWidth = width - margin.left - margin.right;
+  const innerHeight = height - margin.top - margin.bottom;
+
+  const svg = d3.select(chart);
+  svg.attr("width", width).attr("height", height);
+  svg.selectAll("*").remove();
+
+  const root = svg.append("g")
+    .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+  if (values.length === 0) {
+    root.append("text")
+      .attr("x", innerWidth / 2)
+      .attr("y", innerHeight / 2)
+      .attr("text-anchor", "middle")
+      .attr("fill", "#666")
+      .attr("font-size", 12)
+      .text("No game data for this season");
+    return;
+  }
+
+  const xScale = d3.scaleLinear()
+    .domain([0, values.length - 1])
+    .range([0, innerWidth]);
+
+  const yScaleA = d3.scaleLinear()
+    .domain(d3.extent(values, (d) => d.valueA))
+    .nice()
+    .range([innerHeight, 0]);
+
+  const yScaleB = d3.scaleLinear()
+    .domain(d3.extent(values, (d) => d.valueB))
+    .nice()
+    .range([innerHeight, 0]);
+
+  root.append("g")
+    .attr("class", "evolution-grid")
+    .call(d3.axisLeft(yScaleA).ticks(4).tickSize(-innerWidth).tickFormat(""));
+
+  root.append("g")
+    .attr("transform", `translate(0, ${innerHeight})`)
+    .call(d3.axisBottom(xScale).ticks(6).tickFormat((d) => Number.isInteger(d) ? `G${d + 1}` : ""))
+    .call((g) => g.select(".domain").remove())
+    .call((g) => g.selectAll(".tick line").remove());
+
+  root.append("g")
+    .call(d3.axisLeft(yScaleA).ticks(4))
+    .call((g) => g.selectAll("text").attr("fill", colorA))
+    .call((g) => g.selectAll("path, line").attr("stroke", colorA));
+
+  root.append("g")
+    .attr("transform", `translate(${innerWidth}, 0)`)
+    .call(d3.axisRight(yScaleB).ticks(4))
+    .call((g) => g.selectAll("text").attr("fill", colorB))
+    .call((g) => g.selectAll("path, line").attr("stroke", colorB));
+
+  const lineA = d3.line()
+    .x((d) => xScale(d.index))
+    .y((d) => yScaleA(d.valueA));
+
+  const lineB = d3.line()
+    .x((d) => xScale(d.index))
+    .y((d) => yScaleB(d.valueB));
+
+  root.append("path")
+    .datum(values)
+    .attr("fill", "none")
+    .attr("stroke", colorA)
+    .attr("stroke-width", 2)
+    .attr("d", lineA);
+
+  root.append("path")
+    .datum(values)
+    .attr("fill", "none")
+    .attr("stroke", colorB)
+    .attr("stroke-width", 2)
+    .attr("d", lineB);
+
+  root.append("g")
+    .attr("class", "evolution-win-dots")
+    .selectAll("circle")
+    .data(values)
+    .enter()
+    .append("circle")
+    .attr("cx", (d) => xScale(d.index))
+    .attr("cy", innerHeight)
+    .attr("r", 3)
+    .attr("fill", (d) => Number(d.row.win) === 1 ? "#2e7d32" : "#c62828")
+    .attr("opacity", 0.85);
+
+  root.append("text")
+    .attr("x", 0)
+    .attr("y", -6)
+    .attr("fill", colorA)
+    .attr("font-size", 11)
+    .attr("font-weight", "bold")
+    .text(built.evolution.selectedA);
+
+  root.append("text")
+    .attr("x", innerWidth)
+    .attr("y", -6)
+    .attr("text-anchor", "end")
+    .attr("fill", colorB)
+    .attr("font-size", 11)
+    .attr("font-weight", "bold")
+    .text(built.evolution.selectedB);
+
+  const focusGroup = root.append("g")
+    .attr("class", "evolution-focus")
+    .style("display", "none");
+
+  focusGroup.append("line")
+    .attr("class", "evolution-focus-line")
+    .attr("y1", 0)
+    .attr("y2", innerHeight)
+    .attr("stroke", "#9aa0a6")
+    .attr("stroke-width", 1)
+    .attr("stroke-dasharray", "3 3");
+
+  const focusCircleA = focusGroup.append("circle")
+    .attr("r", 4)
+    .attr("fill", "#fff")
+    .attr("stroke", colorA)
+    .attr("stroke-width", 2);
+
+  const focusCircleB = focusGroup.append("circle")
+    .attr("r", 4)
+    .attr("fill", "#fff")
+    .attr("stroke", colorB)
+    .attr("stroke-width", 2);
+
+  if (!built.evolution.tooltipEl) {
+    const tooltip = document.createElement("div");
+    tooltip.className = "evolution-tooltip";
+    tooltip.style.opacity = "0";
+    const evolutionContainer = chart.closest(".evolution") || chart.parentElement;
+    if (evolutionContainer) {
+      evolutionContainer.appendChild(tooltip);
+    }
+    built.evolution.tooltipEl = tooltip;
+  }
+
+  const tooltip = built.evolution.tooltipEl;
+  if (tooltip) {
+    tooltip.style.setProperty("--color-a", colorA);
+    tooltip.style.setProperty("--color-b", colorB);
+  }
+
+  const overlay = root.append("rect")
+    .attr("class", "evolution-overlay")
+    .attr("width", innerWidth)
+    .attr("height", innerHeight)
+    .attr("fill", "transparent")
+    .style("cursor", "crosshair");
+
+  const bisect = d3.bisector((d) => d.index).left;
+
+  function showTooltip(d) {
+    if (!tooltip) return;
+    const row = d.row || {};
+    const opponent = [row.opponentTeamCity, row.opponentTeamName].filter(Boolean).join(" ");
+    const teamScore = coerceNumber(row.teamScore);
+    const opponentScore = coerceNumber(row.opponentScore);
+    const scoreLine = Number.isFinite(teamScore) && Number.isFinite(opponentScore)
+      ? `${teamScore} - ${opponentScore}`
+      : "N/A";
+    const homeLabel = row.home === "1" || row.home === 1 ? "Home" : "Away";
+
+    const statsRows = [
+      { label: "Assists", value: formatNumber(coerceNumber(row.assists), 1) },
+      { label: "Rebounds", value: formatNumber(coerceNumber(row.rebounds), 1) },
+      { label: "Blocks", value: formatNumber(coerceNumber(row.blocks), 1) },
+      { label: "Steals", value: formatNumber(coerceNumber(row.steals), 1) },
+      { label: "Turnovers", value: formatNumber(coerceNumber(row.turnovers), 1) },
+      { label: "Fouls", value: formatNumber(coerceNumber(row.foulsPersonal), 1) },
+      {
+        label: "FG",
+        value: `${formatNumber(coerceNumber(row.fieldGoalsMade), 0)} / ${formatNumber(coerceNumber(row.fieldGoalsAttempted), 0)} (${formatPercent(coerceNumber(row.fieldGoalsPercentage))})`,
+      },
+      {
+        label: "3PT",
+        value: `${formatNumber(coerceNumber(row.threePointersMade), 0)} / ${formatNumber(coerceNumber(row.threePointersAttempted), 0)} (${formatPercent(coerceNumber(row.threePointersPercentage))})`,
+      },
+      {
+        label: "FT",
+        value: `${formatNumber(coerceNumber(row.freeThrowsMade), 0)} / ${formatNumber(coerceNumber(row.freeThrowsAttempted), 0)} (${formatPercent(coerceNumber(row.freeThrowsPercentage))})`,
+      },
+    ];
+
+    tooltip.innerHTML = `
+      <div class="evolution-tooltip-header">
+        <div class="evolution-tooltip-title">G${d.index + 1} ${formatDate(d.date)}</div>
+        <div class="evolution-tooltip-sub">${homeLabel}${opponent ? ` vs ${opponent}` : ""}</div>
+        <div class="evolution-tooltip-score">${scoreLine}</div>
+      </div>
+      <div class="evolution-tooltip-metrics">
+        <div class="metric">
+          <span class="label">${built.evolution.selectedA}</span>
+          <span class="value" style="color: ${colorA}">${formatNumber(d.valueA, 2)}</span>
+        </div>
+        <div class="metric">
+          <span class="label">${built.evolution.selectedB}</span>
+          <span class="value" style="color: ${colorB}">${formatNumber(d.valueB, 2)}</span>
+        </div>
+      </div>
+      <div class="evolution-tooltip-grid">
+        ${statsRows.map((row) => `
+          <div class="row">
+            <span class="label">${row.label}</span>
+            <span class="value">${row.value}</span>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function positionTooltip(x, y) {
+    if (!tooltip) return;
+    const evolutionContainer = chart.closest(".evolution") || chart.parentElement;
+    if (!evolutionContainer) return;
+    const containerRect = evolutionContainer.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    let left = margin.left + x + EVOLUTION_TOOLTIP_PADDING;
+    let top = margin.top + y - tooltipRect.height - EVOLUTION_TOOLTIP_PADDING;
+
+    if (left + tooltipRect.width > containerRect.width) {
+      left = margin.left + x - tooltipRect.width - EVOLUTION_TOOLTIP_PADDING;
+    }
+    if (top < 0) {
+      top = margin.top + y + EVOLUTION_TOOLTIP_PADDING;
+    }
+
+    left = Math.max(0, Math.min(left, containerRect.width - tooltipRect.width - EVOLUTION_TOOLTIP_PADDING));
+    top = Math.max(0, Math.min(top, containerRect.height - tooltipRect.height - EVOLUTION_TOOLTIP_PADDING));
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  }
+
+  function handleMove(event) {
+    if (values.length === 0) return;
+    const [mx] = d3.pointer(event, this);
+    const xValue = xScale.invert(mx);
+    const index = Math.max(0, Math.min(values.length - 1, Math.round(xValue)));
+    const d = values[index];
+    const x = xScale(d.index);
+
+    focusGroup.style("display", null);
+    focusGroup.select(".evolution-focus-line")
+      .attr("x1", x)
+      .attr("x2", x);
+    focusCircleA.attr("cx", x).attr("cy", yScaleA(d.valueA));
+    focusCircleB.attr("cx", x).attr("cy", yScaleB(d.valueB));
+
+    if (tooltip) {
+      tooltip.style.opacity = "1";
+      showTooltip(d);
+      positionTooltip(x, (yScaleA(d.valueA) + yScaleB(d.valueB)) / 2);
+    }
+  }
+
+  function handleLeave() {
+    focusGroup.style("display", "none");
+    if (tooltip) {
+      tooltip.style.opacity = "0";
+    }
+  }
+
+  overlay.on("mousemove", handleMove).on("mouseenter", handleMove).on("mouseleave", handleLeave);
+}
+
+export function makeRadarBuild(radarId, options = {}) {
   return (bubbleMapAttributes, allAttributes, statsUpdate) => {
-    const margin = { top: 100, right: 100, bottom: 100, left: 100 },
-      width = 300,
-      height = 300;
+    const size = options.size || 200;
+    const marginSize = options.margin || 80;
+    const width = size;
+    const height = size;
+    const margin = { top: marginSize, right: marginSize, bottom: marginSize, left: marginSize };
 
-    const color = ["#CC333F"];
+    const color = options.color || ["#CC333F"];
+    const scaleRatio = Math.min(width, height) / 200;
 
     const radarInitialAttributes = Utils.pickItemsWithout(allAttributes, bubbleMapAttributes, RADAR_AXES - bubbleMapAttributes.length);
 
     const radarChartOptions = {
       w: width, h: height, margin: margin,
       maxValue: 1, levels: 4, roundStrokes: true, color: color,
+      axisLabelFontSize: Math.round((options.axisLabelFontSize || 9) * scaleRatio),
+      labelFontSize: Math.round((options.labelFontSize || 12) * scaleRatio),
+      tooltipFontSize: Math.round((options.tooltipFontSize || 11) * scaleRatio),
+      dotRadius: (options.dotRadius || 3) * scaleRatio,
+      strokeWidth: (options.strokeWidth || 2) * scaleRatio,
       allAttributes: allAttributes,
       bubbleMapAttributes: bubbleMapAttributes,
       radarAttributes: radarInitialAttributes,
@@ -90,9 +970,14 @@ export function makeRadarBuild(radarId) {
             e.stopPropagation();
             if (selector.style.display === "none") {
               document.querySelectorAll(".radar-selector").forEach(e => e.style.display = "none");
+              document.querySelectorAll(".htmlAxisLabel").forEach(el => el.style.zIndex = "");
               selector.style.display = "flex";
+              const axisLabel = labelContainer.closest(".htmlAxisLabel");
+              if (axisLabel) axisLabel.style.zIndex = "10";
             } else {
               selector.style.display = "none";
+              const axisLabel = labelContainer.closest(".htmlAxisLabel");
+              if (axisLabel) axisLabel.style.zIndex = "";
             }
           });
 
@@ -119,62 +1004,129 @@ export function makeRadarBuild(radarId) {
   }
 }
 
-export function updateTeamStats(container, built, seasonsLoader, metadataLoader, currentYear, teamId) {
-  // example use of the system
-  const name = container.querySelector(".name");
-  const year = container.querySelector(".year");
-  const content = container.querySelector(".content");
+export function updateTeamStats(container, built, seasonsLoader, metadataLoader, currentYear, teamId, gameType = "Regular Season") {
+  const logo = container.querySelector(".stats-logo");
 
-  console.log(teamId + " " + currentYear);
+  const teamAbbrev = getMetaValue(metadataLoader, teamId, (row) => row["teamAbbrev"], currentYear);
+  const teamSlug = getMetaValue(metadataLoader, teamId, (row) => row["teamSlug"], currentYear);
+  const teamCity = seasonsLoader.getData(currentYear, (row) => row["teamCity"]).get(teamId);
+  const teamName = seasonsLoader.getData(currentYear, (row) => row["teamName"]).get(teamId);
+  const displayName = [teamCity, teamName].filter(Boolean).join(" ");
 
-  name.innerText = metadataLoader.getValue(teamId, (row) => row["teamAbbrev"]); // TODO we don't have the team name in metada
-  year.innerText = currentYear;
+  if (logo) {
+    if (teamSlug) {
+      const activeTill = getMetaValue(metadataLoader, teamId, (row) => row["seasonActiveTill"], currentYear);
+      const activeTillYear = parseInt(activeTill, 10);
+      const logoYear = Number.isNaN(activeTillYear) ? currentYear : activeTillYear;
+      const logoYearSegment = logoYear > 2024 ? "current" : logoYear;
+      logo.src = `https://i.logocdn.com/nba/${logoYearSegment}/${teamSlug}.svg`;
+      logo.alt = displayName || teamAbbrev || teamId;
+      logo.hidden = false;
+    } else {
+      logo.hidden = true;
+      logo.removeAttribute("src");
+    }
+  }
 
-  let attributes = [TEAM_ATTRIBUTES[0], TEAM_ATTRIBUTES[1]];
-  let attributesParse = attributes.map((a) => a[1]);
-  let attributesDisplay = attributes.map((a) => a[0]);
-  let seasonData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...attributesParse));
+  const rankRegularEl = container.querySelector(".summary-rank-regular");
+  const rankPlayoffsEl = container.querySelector(".summary-rank-playoffs");
+  const cityEl = container.querySelector(".summary-city");
+  const teamEl = container.querySelector(".summary-team");
 
-  let teamData = seasonData.get(teamId);
-  content.innerText = attributesDisplay.map((display, index) => display + ": " + teamData[index]).join("\n");
+  if (cityEl) cityEl.textContent = teamCity || "--";
+  if (teamEl) teamEl.textContent = teamName || "--";
+
+  // snapshot the ids before the async gap so we can bail if the user switched teams in the meantime
+  const summaryTargetId = String(teamId);
+  const summaryTargetYear = String(currentYear);
+  loadCsv("./data/team_seasons.csv").then((rows) => {
+    if (summaryTargetId !== String(teamId) || summaryTargetYear !== String(currentYear)) return;
+    const regularRanks = getRankMap(rows, currentYear, "Regular Season");
+    const playoffRanks = getRankMap(rows, currentYear, "Playoffs");
+    const regularSummary = regularRanks.get(summaryTargetId);
+    const playoffSummary = playoffRanks.get(summaryTargetId);
+
+    if (rankRegularEl) {
+      rankRegularEl.textContent = regularSummary
+        ? `#${regularSummary.rank} (${regularSummary.wins}-${regularSummary.losses})`
+        : "--";
+    }
+    if (rankPlayoffsEl) {
+      rankPlayoffsEl.textContent = playoffSummary
+        ? `#${playoffSummary.rank} (${playoffSummary.wins}-${playoffSummary.losses})`
+        : "--";
+    }
+  }).catch(() => {
+    if (rankRegularEl) rankRegularEl.textContent = "--";
+    if (rankPlayoffsEl) rankPlayoffsEl.textContent = "--";
+  });
+
+  const legendTeam = container.querySelector(".radar-legend .legend-item.team");
+  const legendAverage = container.querySelector(".radar-legend .legend-item.average");
+
+  const rawColorA = getMetaValue(metadataLoader, teamId, (row) => row["Color1"], currentYear);
+  const rawColorB = getMetaValue(metadataLoader, teamId, (row) => row["Color2"], currentYear);
+  const color3 = getMetaValue(metadataLoader, teamId, (row) => row["Color3"], currentYear);
+  const colorA = resolveColor(rawColorA, resolveColor(color3, "#CC333F"));
+  const colorB = resolveColor(rawColorB, resolveColor(color3, "rgba(80, 80, 80, 0.7)"));
+  if (legendTeam) {
+    legendTeam.style.color = colorA;
+  }
+  if (legendAverage) {
+    legendAverage.style.color = colorB;
+  }
+  built.evolutionTheme = { colorA, colorB };
 
   // radar chart
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
-  let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
-  data = Data.applyData(data, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
-  let teamRadarData = data.get(teamId)
-  let dataPoints = [radarFullAttributes.map((_, i) => {
-    return { axis: i, value: teamRadarData[i] };
-  })];
-  built.radar.update(dataPoints, TRANSITION_TIME, built)
+  let rawData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
+  let data = Data.applyData(rawData, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
+  const teamRawData = rawData.get(teamId) || [];
+  const teamRadarData = data.get(teamId) || [];
+  const allTeamData = Array.from(data.values());
+  const averageRadarData = averageArrays(allTeamData);
+  const averageRawData = averageArrays(Array.from(rawData.values()));
+
+  const dataPoints = [
+    radarFullAttributes.map((attr, i) => ({ axis: i, value: teamRadarData[i], rawValue: teamRawData[i], axisName: attr[0] })),
+    radarFullAttributes.map((attr, i) => ({ axis: i, value: averageRadarData[i], rawValue: averageRawData[i], axisName: attr[0] })),
+  ];
+
+  built.gameType = gameType;
+  built.colors = [colorA, colorB];
+  built.radar.update(dataPoints, TRANSITION_TIME, built);
+
+  updateEvolutionChart(container, currentYear, teamId, built);
+  updateMatchups(container, currentYear, teamId, metadataLoader, gameType);
 }
 
-export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId) {
+export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId, gameType = "Regular Season") {
   // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");
   const content = container.querySelector(".content");
 
-  console.log(playerId + " " + currentYear);
-
-  name.innerText = metadataLoader.getValue(playerId, (row) => row["firstName"] + " " + row["lastName"]);
+  name.innerText = getMetaValue(metadataLoader, playerId, (row) => row["firstName"] + " " + row["lastName"], currentYear);
   year.innerText = currentYear;
 
-  let attributes = [PLAYER_ATTRIBUTES[0], PLAYER_ATTRIBUTES[1]];
-  let attributesParse = attributes.map((a) => a[1]);
-  let attributesDisplay = attributes.map((a) => a[0]);
-  let seasonData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...attributesParse));
+  const attributes = PLAYER_ATTRIBUTES;
+  const attributesParse = attributes.map((a) => a[1]);
+  const attributesDisplay = attributes.map((a) => a[0]);
+  const seasonData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...attributesParse));
 
-  let playerData = seasonData.get(playerId);
-  content.innerText = attributesDisplay.map((display, index) => display + ": " + playerData[index]).join("\n");
+  const playerData = seasonData.get(playerId) || [];
+  content.innerText = attributesDisplay
+    .map((display, index) => `${display}: ${formatValue(playerData[index])}`)
+    .join("\n");
 
   // radar chart
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
-  let data = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
-  data = Data.applyData(data, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
-  let playerRadarData = data.get(playerId)
-  let dataPoints = [radarFullAttributes.map((_, i) => {
-    return { axis: i, value: playerRadarData[i] };
+  let rawData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
+  let data = Data.applyData(rawData, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
+  const playerRawData = rawData.get(playerId) || [];
+  let playerRadarData = data.get(playerId) || [];
+  let dataPoints = [radarFullAttributes.map((attr, i) => {
+    return { axis: i, value: playerRadarData[i], rawValue: playerRawData[i], axisName: attr[0] };
   })];
   built.radar.update(dataPoints, TRANSITION_TIME, built)
 }

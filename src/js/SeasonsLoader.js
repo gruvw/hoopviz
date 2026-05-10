@@ -1,10 +1,15 @@
 export class SeasonsLoader {
   #data = [];
   #csvUrl;
+  #gameType = "Regular Season";
 
   constructor(csvUrl, keyName) {
     this.displayName = keyName;
     this.#csvUrl = csvUrl;
+  }
+
+  setGameType(gameType) {
+    this.#gameType = gameType;
   }
 
   async load() {
@@ -25,10 +30,7 @@ export class SeasonsLoader {
         row[header.trim()] = values[index]?.trim() ?? "";
       });
 
-      // filter only regular season
-      if (row.gameType === "Regular Season") {
-        this.#data.push(row);
-      }
+      this.#data.push(row);
     }
   }
 
@@ -56,7 +58,7 @@ export class SeasonsLoader {
     const result = new Map();
 
     for (const row of this.#data) {
-      if (row.season === year.toString()) {
+      if (row.season === year.toString() && row.gameType === this.#gameType) {
         const name = this.displayName(row);
         if (name) {
           const values = attributeKeys.map((parse) => parse(row));
@@ -72,6 +74,16 @@ export class SeasonsLoader {
     const seasons = new Set();
     for (const row of this.#data) {
       seasons.add(parseInt(row.season.split("-")[0]));
+    }
+    return Array.from(seasons).sort();
+  }
+
+  getYearsForGameType(gameType) {
+    const seasons = new Set();
+    for (const row of this.#data) {
+      if (row.gameType === gameType) {
+        seasons.add(parseInt(row.season.split("-")[0]));
+      }
     }
     return Array.from(seasons).sort();
   }
