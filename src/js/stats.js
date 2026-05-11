@@ -1410,19 +1410,32 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
 
   const reqId = ++playerStatsReqId;
 
+  loadShots(playerId, currentYear).then(shots => {
+    if (reqId !== playerStatsReqId) return;
+    if (shots !== null) drawShotChart(chartEl, shots);
+  }).catch(() => {
+    if (reqId !== playerStatsReqId) return;
+    d3.select(chartEl).selectAll('*').remove();
+    d3.select(chartEl)
+      .attr("viewBox", "0 0 601 444").attr("preserveAspectRatio", "xMidYMid meet")
+      .append("text")
+        .attr("x", 300).attr("y", 222)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#ffffff").attr("font-size", 16)
+        .text("No shot data");
+  });
+
   Promise.all([
     loadPlayerGames(playerId),
-    loadShots(playerId, currentYear),
     loadCsv('./data/team_seasons.csv'),
     loadCsv('./data/team_metadata.csv'),
-  ]).then(([allGames, shots, teamSeasons, teamMeta]) => {
+  ]).then(([allGames, teamSeasons, teamMeta]) => {
     if (reqId !== playerStatsReqId) return;
 
     const games = allGames
       .filter(r => +r.season === +currentYear && !r.gameType.toLowerCase().includes('pre'))
       .sort((a, b) => new Date(a.gameDateTimeEst || 0) - new Date(b.gameDateTimeEst || 0));
 
-    // derive player's team for this season (most games played = primary team)
     const teamCounts = new Map();
     games.filter(r => r.gameType === 'Regular Season' && r.playerteamName).forEach(r => {
       const key = `${r.playerteamCity}|${r.playerteamName}`;
@@ -1449,7 +1462,6 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
         renderAverages(container.querySelector('.player-averages'), games);
         renderCalendarHeatmap(games, currentYear, statsArea, colorA);
         renderGamesChart(document.getElementById('player-games-chart'), games, colorA);
-        if (shots !== null) drawShotChart(chartEl, shots);
         return;
       }
     }
@@ -1457,17 +1469,5 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
     renderAverages(container.querySelector('.player-averages'), games);
     renderCalendarHeatmap(games, currentYear, statsArea);
     renderGamesChart(document.getElementById('player-games-chart'), games);
-
-    if (shots !== null) drawShotChart(chartEl, shots);
-  }).catch(() => {
-    if (reqId !== playerStatsReqId) return;
-    d3.select(chartEl).selectAll('*').remove();
-    d3.select(chartEl)
-      .attr("viewBox", "0 0 601 444").attr("preserveAspectRatio", "xMidYMid meet")
-      .append("text")
-        .attr("x", 300).attr("y", 222)
-        .attr("text-anchor", "middle")
-        .attr("fill", "#ffffff").attr("font-size", 16)
-        .text("Failed to load shot data");
   });
 }
