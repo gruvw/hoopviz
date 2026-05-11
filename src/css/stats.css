@@ -304,7 +304,8 @@
     align-self: stretch;
 }
 
-#teams .stats {
+#teams .stats,
+#players .stats {
     padding: 0;
 }
 
@@ -786,12 +787,6 @@
     stroke: none;
 }
 
-/* #players .stats-area {
-  align-items: stretch;
-  justify-content: flex-start;
-  position: relative;
-  padding: 80px 16px 16px;
-} */
 
 #players .stats-close {
   position: absolute;

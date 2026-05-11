@@ -27,6 +27,7 @@ new Screens({
     metadataLoader: new MetadataLoader("./data/players_metadata.csv", (row) => row["personId"]),
     bubbleContent: (row) => row["firstName"] + " " + row["lastName"],
     bubbleColor: (row) => "#005ce6",
+    bubbleLogoUrl: (row) => `https://cdn.nba.com/headshots/nba/latest/1040x760/${row["personId"]}.png`,
     statsUpdate: Stats.updatePlayerStats,
     attributes: Stats.PLAYER_ATTRIBUTES,
     build: Stats.makeRadarBuild("#player-radar", { size: 240, margin: 90 }),
