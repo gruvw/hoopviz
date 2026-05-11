@@ -1167,7 +1167,7 @@ function renderAverages(el, games) {
   });
 }
 
-function renderCalendarHeatmap(games, currentYear, statsAreaEl) {
+function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285') {
   if (calInstance) {
     try { calInstance.destroy(); } catch (e) {}
     calInstance = null;
@@ -1214,13 +1214,13 @@ function renderCalendarHeatmap(games, currentYear, statsAreaEl) {
       subDomain: {
         type: 'ghDay',
         radius: 2,
-        width: 10,
-        height: 10,
+        width: 15,
+        height: 15,
         gutter: 2,
       },
       scale: {
         color: {
-          range: ['#0c2050', '#ffffff'],
+          range: ['#ffffff', color],
           type: 'linear',
           domain: [0, maxPts],
         },
@@ -1384,12 +1384,46 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
   Promise.all([
     loadPlayerGames(playerId),
     loadShots(playerId, currentYear),
-  ]).then(([allGames, shots]) => {
+    loadCsv('./data/team_seasons.csv'),
+    loadCsv('./data/team_metadata.csv'),
+  ]).then(([allGames, shots, teamSeasons, teamMeta]) => {
     if (reqId !== playerStatsReqId) return;
 
     const games = allGames
       .filter(r => +r.season === +currentYear && !r.gameType.toLowerCase().includes('pre'))
       .sort((a, b) => new Date(a.gameDateTimeEst || 0) - new Date(b.gameDateTimeEst || 0));
+
+    // derive player's team for this season (most games played = primary team)
+    const teamCounts = new Map();
+    games.filter(r => r.gameType === 'Regular Season' && r.playerteamName).forEach(r => {
+      const key = `${r.playerteamCity}|${r.playerteamName}`;
+      teamCounts.set(key, (teamCounts.get(key) || 0) + 1);
+    });
+    const topTeamKey = [...teamCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (topTeamKey) {
+      const [city, name] = topTeamKey.split('|');
+      const teamRow = teamSeasons.find(r => +r.season === +currentYear && r.teamName === name && r.teamCity === city);
+      const metaRow = teamRow ? teamMeta.find(r => r.teamId === String(teamRow.teamId)) : null;
+      if (metaRow) {
+        const colorA = resolveColor(metaRow.Color1, resolveColor(metaRow.Color3, '#005ce6'));
+        const colorB = resolveColor(metaRow.Color2, resolveColor(metaRow.Color3, 'rgba(80,80,80,0.7)'));
+        statsArea.style.background = colorA;
+        const teamLogoEl = container.querySelector('.player-team-logo');
+        if (teamLogoEl && metaRow.teamSlug) {
+          const activeTill = parseInt(metaRow.seasonActiveTill, 10);
+          const logoYearSeg = (!isNaN(activeTill) && activeTill <= 2024) ? activeTill : 'current';
+          teamLogoEl.src = `https://i.logocdn.com/nba/${logoYearSeg}/${metaRow.teamSlug}.svg`;
+          teamLogoEl.hidden = false;
+        }
+        built.colors = [colorA, colorB];
+        built.radar.update(dataPoints, 0, built);
+        renderAverages(container.querySelector('.player-averages'), games);
+        renderCalendarHeatmap(games, currentYear, statsArea, colorA);
+        renderGamesChart(document.getElementById('player-games-chart'), games);
+        if (shots !== null) drawShotChart(chartEl, shots);
+        return;
+      }
+    }
 
     renderAverages(container.querySelector('.player-averages'), games);
     renderCalendarHeatmap(games, currentYear, statsArea);

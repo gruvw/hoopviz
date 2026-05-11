@@ -788,6 +788,10 @@
 }
 
 
+#players .stats-area {
+  padding-top: 100px;
+}
+
 #players .stats-close {
   position: absolute;
   top: 12px;
@@ -818,6 +822,7 @@
 
 .player-headshot-card {
   flex: 1;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -830,9 +835,19 @@
   overflow: hidden;
 }
 
+.player-team-logo {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  opacity: 0.85;
+}
+
 .player-headshot {
-  width: min(110px, 85%);
-  height: min(110px, 85%);
+  width: 85%;
+  height: 85%;
   object-fit: contain;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
 }
