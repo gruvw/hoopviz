@@ -52,20 +52,22 @@ export function drawShotChart(svgEl, shots) {
     .attr("opacity", 0.7);
 }
 
-export async function loadShots(personId, season) {
+function getShotFile(season) {
+  const s = +season;
+  if (s <= 2006) return "data/shot_events_1996_2006.csv";
+  if (s <= 2015) return "data/shot_events_2007_2015.csv";
+  return "data/shot_events_2016_2024.csv";
+}
+
+export async function loadShots(personId, season, gameType = "Regular Season") {
   const requestId = ++_shotRequestId;
-  const parts = [
-    "data/shot_events_part1.csv",
-    "data/shot_events_part2.csv",
-    "data/shot_events_part3.csv",
-  ];
-  let frames;
+  let rows;
   try {
-    frames = await Promise.all(parts.map(p => d3.csv(p)));
+    rows = await d3.csv(getShotFile(season));
   } catch (e) {
     throw new Error(`Failed to load shot data: ${e.message}`);
   }
   if (requestId !== _shotRequestId) return null;
-  const all = frames.flat();
-  return all.filter(d => +d.personId === +personId && +d.season === +season);
+  const isPlayoffs = gameType === "Playoffs" ? 1 : 0;
+  return rows.filter(d => +d.personId === +personId && +d.season === +season && +d.playoffs === isPlayoffs);
 }

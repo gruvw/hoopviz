@@ -1410,7 +1410,7 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
 
   const reqId = ++playerStatsReqId;
 
-  loadShots(playerId, currentYear).then(shots => {
+  loadShots(playerId, currentYear, gameType).then(shots => {
     if (reqId !== playerStatsReqId) return;
     if (shots !== null) drawShotChart(chartEl, shots);
   }).catch(() => {
