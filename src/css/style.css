@@ -231,6 +231,11 @@ section#players:not(.selected) {
     user-select: none;
 }
 
+#players .bubble-logo-img {
+    object-fit: cover;
+    border-radius: 50%;
+}
+
 .bubble.transition {
   transition:
         translate var(--transition-time) ease-in-out,
