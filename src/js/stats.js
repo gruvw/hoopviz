@@ -1433,11 +1433,11 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
     if (reqId !== playerStatsReqId) return;
 
     const games = allGames
-      .filter(r => +r.season === +currentYear && !r.gameType.toLowerCase().includes('pre'))
+      .filter(r => +r.season === +currentYear && r.gameType === gameType)
       .sort((a, b) => new Date(a.gameDateTimeEst || 0) - new Date(b.gameDateTimeEst || 0));
 
     const teamCounts = new Map();
-    games.filter(r => r.gameType === 'Regular Season' && r.playerteamName).forEach(r => {
+    games.filter(r => r.playerteamName).forEach(r => {
       const key = `${r.playerteamCity}|${r.playerteamName}`;
       teamCounts.set(key, (teamCounts.get(key) || 0) + 1);
     });
