@@ -35,13 +35,13 @@ export function drawShotChart(svgEl, shots) {
     .join("circle")
     .attr("cx", d => toSvgX(+d.locX))
     .attr("cy", d => toSvgY(+d.locY))
-    .attr("r", 4)
+    .attr("r", 5)
     .attr("fill", "none")
     .attr("stroke", "#31e77d")
     .attr("stroke-width", 1.5)
     .attr("opacity", 0.7);
 
-  const cross = d3.symbol().type(d3.symbolCross).size(40);
+  const cross = d3.symbol().type(d3.symbolCross).size(50);
 
   svg.selectAll("path")
     .data(missed)
