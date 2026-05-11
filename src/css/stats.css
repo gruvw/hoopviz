@@ -982,10 +982,8 @@
 }
 
 .player-bottom-left #player-chart {
-  width: 100%;
-  height: 100%;
-  max-width: 430px;
-  max-height: 320px;
+  width: 53%;
+  height: auto;
 }
 
 .shot-chart-attribution {
