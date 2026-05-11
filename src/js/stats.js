@@ -1187,13 +1187,30 @@ function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285
   try {
     calInstance = new window.CalHeatmap();
 
-    calInstance.on('click', (event, timestamp, value) => {
-      event.stopPropagation();
+    calInstance.on('mouseover', (event, timestamp, value) => {
       if (value == null) return;
       const d = new Date(timestamp);
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (event.target?.tagName === 'rect') {
+        event.target.style.stroke = color;
+        event.target.style.strokeWidth = '2px';
+      }
+      d3.select('#player-games-chart').selectAll('rect')
+        .filter(d => d?.gameDateTimeEst?.slice(0, 10) === dateStr)
+        .attr('fill', color);
       const game = gamesByDate.get(dateStr);
       if (game) showGamePopup(event, game, statsAreaEl);
+    });
+
+    calInstance.on('mouseout', (event, timestamp, value) => {
+      if (event.target?.tagName === 'rect') {
+        event.target.style.stroke = '';
+        event.target.style.strokeWidth = '';
+      }
+      d3.select('#player-games-chart').selectAll('rect')
+        .attr('fill', d => d && +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
+      const popup = statsAreaEl.querySelector('.game-popup');
+      if (popup) popup.style.display = 'none';
     });
 
     calInstance.paint({
@@ -1247,7 +1264,6 @@ function showGamePopup(event, game, statsAreaEl) {
   const score = (game.homeScore && game.awayScore) ? `${game.homeScore}–${game.awayScore}` : '';
 
   popup.innerHTML = `
-    <button class="popup-close">×</button>
     <div class="popup-matchup">
       <span class="popup-wl ${won ? 'popup-win' : 'popup-loss'}">${wl}</span>
       <span class="popup-opp">${ha} ${opp}</span>
@@ -1277,14 +1293,9 @@ function showGamePopup(event, game, statsAreaEl) {
   if (top  + 200 > areaRect.height - 8) top  = event.clientY - areaRect.top  - 212;
 
   popup.style.cssText = `display:block; left:${Math.max(8, left)}px; top:${Math.max(8, top)}px; transform:none;`;
-
-  popup.querySelector('.popup-close').onclick = e => {
-    e.stopPropagation();
-    popup.style.display = 'none';
-  };
 }
 
-function renderGamesChart(svgEl, games) {
+function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
   const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
   if (!games.length) return;
@@ -1310,7 +1321,34 @@ function renderGamesChart(svgEl, games) {
     .attr('y', d => y(+d.points))
     .attr('width', x.bandwidth())
     .attr('height', d => iH - y(+d.points))
-    .attr('fill', d => +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
+    .attr('fill', d => +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)')
+    .on('mouseover', function(event, d) {
+      d3.select(this).attr('fill', teamColor);
+      const dateStr = d?.gameDateTimeEst?.slice(0, 10);
+      if (dateStr) {
+        const ts = new Date(dateStr).getTime();
+        const calRect =
+          document.querySelector(`#player-calendar rect[data-date="${dateStr}"]`) ||
+          document.querySelector(`#player-calendar rect[data-date="${ts}"]`);
+        if (calRect) {
+          calRect.style.stroke = teamColor;
+          calRect.style.strokeWidth = '2px';
+        }
+        const game = gamesByDate.get(dateStr);
+        const statsAreaEl = svgEl.closest('.stats-area');
+        if (game && statsAreaEl) showGamePopup(event, game, statsAreaEl);
+      }
+    })
+    .on('mouseout', function(event, d) {
+      d3.select(this).attr('fill', +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
+      document.querySelectorAll('#player-calendar [data-date]').forEach(el => {
+        el.style.stroke = '';
+        el.style.strokeWidth = '';
+      });
+      const statsAreaEl = svgEl.closest('.stats-area');
+      const popup = statsAreaEl?.querySelector('.game-popup');
+      if (popup) popup.style.display = 'none';
+    });
 
   g.append('line')
     .attr('x1', 0).attr('y1', iH).attr('x2', iW).attr('y2', iH)
@@ -1356,15 +1394,6 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
 
   // games, calendar, shot chart
   const statsArea = container.querySelector('.stats-area') || container;
-  if (!statsArea.dataset.popupListener) {
-    statsArea.dataset.popupListener = '1';
-    statsArea.addEventListener('click', e => {
-      const popup = statsArea.querySelector('.game-popup');
-      if (popup && popup.style.display !== 'none' && !popup.contains(e.target)) {
-        popup.style.display = 'none';
-      }
-    });
-  }
 
   const chartEl = document.getElementById("player-chart");
   if (!chartEl) return;
@@ -1419,7 +1448,7 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
         built.radar.update(dataPoints, 0, built);
         renderAverages(container.querySelector('.player-averages'), games);
         renderCalendarHeatmap(games, currentYear, statsArea, colorA);
-        renderGamesChart(document.getElementById('player-games-chart'), games);
+        renderGamesChart(document.getElementById('player-games-chart'), games, colorA);
         if (shots !== null) drawShotChart(chartEl, shots);
         return;
       }

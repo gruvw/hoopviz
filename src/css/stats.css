@@ -846,8 +846,8 @@
 }
 
 .player-headshot {
-  width: 85%;
-  height: 85%;
+  width: 80%;
+  height: 80%;
   object-fit: contain;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
 }
@@ -883,10 +883,20 @@
   border-radius: 14px;
 }
 
+.player-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  color: #000000;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
 .player-cal-col {
   flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
   overflow: hidden;
   padding: 8px 12px;
 }
@@ -998,26 +1008,10 @@
   width: 300px;
   padding: 14px 16px;
   z-index: 200;
-  background: #ffffffc3;
+  background: #ffffff;
   border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 10px;
   pointer-events: auto;
-}
-
-.popup-close {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  padding: 2px 4px;
-  background: none;
-  border: none;
-  color: rgba(0,0,0,0.35);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.popup-close:hover {
-  color: #111;
 }
 
 .popup-matchup {
