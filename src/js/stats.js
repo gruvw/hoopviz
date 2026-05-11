@@ -1231,8 +1231,8 @@ function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285
       subDomain: {
         type: 'ghDay',
         radius: 2,
-        width: 15,
-        height: 15,
+        width: 14,
+        height: 14,
         gutter: 2,
       },
       scale: {
