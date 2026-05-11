@@ -309,8 +309,22 @@
     padding: 0;
 }
 
-#teams .stats-close {
-    display: none;
+.stats-close-layer {
+  pointer-events: none;
+  z-index: 101;
+}
+
+.stats-close-layer .stats-close {
+  display: none;
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  pointer-events: auto;
+  color: rgba(255,255,255,0.7);
+}
+
+.stats-close-layer .stats-close:hover {
+  color: white;
 }
 
 .matchup-card {
@@ -792,17 +806,6 @@
   padding-top: 100px;
 }
 
-#players .stats-close {
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  z-index: 10;
-  color: rgba(255,255,255,0.7);
-}
-
-#players .stats-close:hover {
-  color: white;
-}
 
 .player-panel {
   display: flex;

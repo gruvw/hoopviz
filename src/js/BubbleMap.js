@@ -29,7 +29,7 @@ export class BubbleMap {
     this.measureBubble = this.container.querySelector(".measure-bubble");
     this.stats = this.container.querySelector(".stats");
     this.statsArea = this.stats.querySelector(".stats-area");
-    this.statsClose = this.statsArea.querySelector(".stats-close");
+    this.statsClose = document.querySelector(".stats-close-layer .stats-close");
     this.overlay = this.container.querySelector(".overlay");
 
     this.axisX = this.container.querySelector(".axis.x");
@@ -354,6 +354,7 @@ export class BubbleMap {
         this.statsArea.style.background = bubble.style.background;
 
         this.stats.classList.add("active");
+        if (this.statsClose) this.statsClose.style.display = "block";
         this.statsUpdate();
       });
 
@@ -417,6 +418,9 @@ export class BubbleMap {
   closeStats() {
     this.stats.classList.remove("active");
     this.statsItem = null;
+    if (this.statsClose && !document.querySelector("#screens .stats.active")) {
+      this.statsClose.style.display = "none";
+    }
   }
 
   bindMapEvents() {
