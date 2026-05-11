@@ -289,7 +289,7 @@ export class BubbleMap {
     bubble.classList.remove("bubble-logo");
     bubble.style.background = "";
     bubble.textContent = "";
-    bubble.querySelectorAll(".bubble-logo-img").forEach((img) => img.remove());
+    bubble.querySelectorAll(".bubble-logo-img, .bubble-hover-label").forEach((el) => el.remove());
 
     const logoSrc = bubbleLogoUrl || (bubbleLogo ? this.getLogoUrl(itemId, bubbleLogo) : null);
     if (logoSrc) {
@@ -301,6 +301,12 @@ export class BubbleMap {
       logo.decoding = "async";
       logo.loading = "lazy";
       bubble.appendChild(logo);
+      if (bubbleContent) {
+        const label = document.createElement("span");
+        label.className = "bubble-hover-label";
+        label.textContent = bubbleContent;
+        bubble.appendChild(label);
+      }
       return;
     }
 
