@@ -51,9 +51,6 @@ nav {
     --tab-selector-gap: 8px;
 }
 
-#game-type-select {
-    --tab-selector-width: 120px;
-}
 
 nav h1 {
     color: white;
