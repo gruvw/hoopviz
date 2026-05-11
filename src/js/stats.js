@@ -1310,44 +1310,38 @@ function renderGamesChart(svgEl, games) {
     .attr('y', d => y(+d.points))
     .attr('width', x.bandwidth())
     .attr('height', d => iH - y(+d.points))
-    .attr('fill', d => +d.win === 1 ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.2)');
+    .attr('fill', d => +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
 
   g.append('line')
     .attr('x1', 0).attr('y1', iH).attr('x2', iW).attr('y2', iH)
-    .attr('stroke', 'rgba(255,255,255,0.12)').attr('stroke-width', 1);
+    .attr('stroke', 'rgba(0,0,0,0.1)').attr('stroke-width', 1);
 
   [0, maxPts].forEach(v => {
     g.append('text')
       .attr('x', -4).attr('y', y(v) + (v === 0 ? 0 : 4))
       .attr('text-anchor', 'end').attr('font-size', 9)
-      .attr('fill', 'rgba(255,255,255,0.35)')
+      .attr('fill', 'rgba(0,0,0,0.4)')
       .text(v);
   });
 
   g.append('text')
     .attr('x', iW / 2).attr('y', iH + 16)
     .attr('text-anchor', 'middle').attr('font-size', 9)
-    .attr('fill', 'rgba(255,255,255,0.3)')
+    .attr('fill', 'rgba(0,0,0,0.4)')
     .text('PTS per game');
 }
 
 export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId, gameType = "Regular Season") {
   const name = container.querySelector(".name");
-  const year = container.querySelector(".year");
-  const content = container.querySelector(".content");
+  const playerName = getMetaValue(metadataLoader, playerId, (row) => row["firstName"] + " " + row["lastName"], currentYear);
+  name.innerText = playerName;
 
-  name.innerText = getMetaValue(metadataLoader, playerId, (row) => row["firstName"] + " " + row["lastName"], currentYear);
-  year.innerText = currentYear;
-
-  const attributes = PLAYER_ATTRIBUTES;
-  const attributesParse = attributes.map((a) => a[1]);
-  const attributesDisplay = attributes.map((a) => a[0]);
-  const seasonData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...attributesParse));
-
-  const playerData = seasonData.get(playerId) || [];
-  content.innerText = attributesDisplay
-    .map((display, index) => `${display}: ${formatValue(playerData[index])}`)
-    .join("\n");
+  const headshot = container.querySelector(".player-headshot");
+  if (headshot) {
+    headshot.src = `https://cdn.nba.com/headshots/nba/latest/1040x760/${playerId}.png`;
+    headshot.hidden = false;
+    headshot.onerror = () => { headshot.hidden = true; };
+  }
 
   // radar chart
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
@@ -1372,7 +1366,7 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
     });
   }
 
-  const chartEl = document.getElementById("#player-chart");
+  const chartEl = document.getElementById("player-chart");
   if (!chartEl) return;
 
   const loadingSvg = d3.select(chartEl);
@@ -1399,8 +1393,7 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
 
     renderAverages(container.querySelector('.player-averages'), games);
     renderCalendarHeatmap(games, currentYear, statsArea);
-    renderGamesChart(document.getElementById('#player-games-chart'), games);
-    if (gamesChart) renderGamesChart(gamesChart, games);
+    renderGamesChart(document.getElementById('player-games-chart'), games);
 
     if (shots !== null) drawShotChart(chartEl, shots);
   }).catch(() => {

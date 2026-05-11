@@ -303,7 +303,7 @@ section#players:not(.selected) {
     font-size: 12px;
     text-align: center;
 
-    color: #fff;
+    color: #ffffffe4;
     z-index: 100;
     pointer-events: none;
 }

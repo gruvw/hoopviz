@@ -12,6 +12,8 @@
     position: relative;
     gap: 5px;
     overflow: visible;
+
+    padding: 80px 20px 50px;
 }
 
 .stats-close {
@@ -304,10 +306,6 @@
 
 #teams .stats {
     padding: 0;
-}
-
-#teams .stats-area {
-    padding: 80px 20px 50px;
 }
 
 #teams .stats-close {
@@ -788,11 +786,12 @@
     stroke: none;
 }
 
-#players .stats-area {
+/* #players .stats-area {
   align-items: stretch;
   justify-content: flex-start;
   position: relative;
-}
+  padding: 80px 16px 16px;
+} */
 
 #players .stats-close {
   position: absolute;
@@ -812,54 +811,74 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  padding-top: 90px;
+  gap: 12px;
 }
 
 .player-top {
-  flex: none;
+  flex: 0 0 45%;
   display: flex;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  gap: 12px;
+  min-height: 0;
 }
 
-.player-image-col {
-  flex: 0 0 140px;
+.player-headshot-card {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px 8px 10px;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 10px 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 14px;
+  overflow: hidden;
 }
 
-.player-image-placeholder {
-  width: 110px;
-  height: 110px;
+.player-headshot {
+  width: min(110px, 85%);
+  height: min(110px, 85%);
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
 }
 
-.player-stats-col .name {
-  margin-bottom: 8px;
-  font-size: 18px;
-  font-weight: 700;
-  color: white;
+.player-name-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
-.player-stats-col,
-.player-cal-col {
-  padding: 12px 16px;
-  border-left: 1px solid rgba(255,255,255,0.08);
+.player-radar-card {
+  flex: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 14px;
+  overflow: hidden;
 }
-
-.player-stats-col { flex: 1; }
-.player-cal-col   { flex: 2; }
 
 .player-stats-col {
+  flex: 2;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 14px;
 }
 
 .player-cal-col {
+  flex: 1;
   display: flex;
   align-items: center;
   overflow: hidden;
+  padding: 8px 12px;
 }
 
 .player-averages {
@@ -880,14 +899,14 @@
   font-size: 17px;
   font-weight: 700;
   line-height: 1.1;
-  color: white;
+  color: #111;
   font-variant-numeric: tabular-nums;
 }
 
 .avg-label {
   margin-top: 2px;
   font-size: 9px;
-  color: rgba(255,255,255,0.45);
+  color: #888;
   text-transform: uppercase;
   letter-spacing: 0.07em;
 }
@@ -908,7 +927,7 @@
 
 #player-calendar text,
 #player-calendar tspan {
-  fill: rgba(255,255,255,0.4) !important;
+  fill: rgba(0,0,0,0.45) !important;
   font-family: sans-serif !important;
   font-size: 9px !important;
 }
@@ -917,21 +936,23 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  gap: 12px;
 }
 
 .player-bottom-left,
-.player-bottom-center,
 .player-bottom-right {
   display: flex;
   overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .player-bottom-left {
-  flex: 0 0 45%;
+  flex: 1;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  border-right: 1px solid rgba(255,255,255,0.1);
 }
 
 .player-bottom-left #player-chart {
@@ -940,25 +961,25 @@
   max-width: 600px;
 }
 
-.player-bottom-center {
+.player-bottom-right {
   flex: 1;
-  align-items: center;
-  justify-content: center;
-  border-right: 1px solid rgba(255,255,255,0.1);
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
 }
 
-.player-bottom-right {
-  flex: 0 0 28%;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
+.player-games-col {
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
 
 #player-games-chart {
   display: block;
   width: 100%;
-  height: 140px;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .game-popup {

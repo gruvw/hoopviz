@@ -185,33 +185,31 @@
           <span class="stats-close material-symbols-outlined">close</span>
           <div class="player-panel">
             <div class="player-top">
-              <div class="player-image-col">
-                <div class="player-image-placeholder">image</div>
+              <div class="player-headshot-card">
+                <img class="player-headshot" alt="Player photo" hidden>
+                <h1 class="name player-name-label"></h1>
+              </div>
+              <div class="player-radar-card">
+                <div class="radar" id="player-radar"></div>
               </div>
               <div class="player-stats-col">
-                <h1 class="name"></h1>
                 <div class="player-averages"></div>
-              </div>
-              <div class="player-cal-col">
-                <div id="player-calendar"></div>
               </div>
             </div>
             <div class="player-bottom">
               <div class="player-bottom-left">
                 <svg id="player-chart"></svg>
               </div>
-              <div class="player-bottom-center">
-                <span>spider chart</span>
-              </div>
               <div class="player-bottom-right">
-                <svg id="player-games-chart"></svg>
+                <div class="player-cal-col">
+                  <div id="player-calendar"></div>
+                </div>
+                <div class="player-games-col">
+                  <svg id="player-games-chart"></svg>
+                </div>
               </div>
             </div>
           </div>
-          <h1 class="name"></h1>
-          <h2 class="year"></h2>
-          <p class="content"></p>
-          <div class="radar" id="player-radar"></div>
         </div>
       </div>
     </section>
