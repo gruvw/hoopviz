@@ -1,21 +1,16 @@
 .stats-area {
     display: flex;
-    justify-content: center;
-    align-items: center;
+    align-items: stretch;
+    justify-content: flex-start;
+    position: relative;
     flex-direction: column;
 
-    background: #e0e0e0;
-
-    width: min(92%, 1180px);
+    width: 100%;
     max-height: calc(100% - 40px);
     height: calc(100% - 40px);
 
-    border: 2px solid black;
-    border-radius: 20px;
-
     position: relative;
-    gap: 16px;
-    padding: 24px 22px 20px;
+    gap: 5px;
     overflow: visible;
 }
 
@@ -144,8 +139,28 @@
     position: relative;
 }
 
+.logo-team-name {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(20px, 3.5vw, 38px);
+    font-weight: 900;
+    color: rgba(0, 0, 0, 0.08);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: center;
+    padding: 12px;
+    line-height: 1.1;
+    word-break: break-word;
+    pointer-events: none;
+    z-index: 0;
+}
+
 .stats-logo {
-    position: static;
+    position: relative;
+    z-index: 1;
     width: min(150px, 80%);
     height: min(150px, 80%);
     object-fit: contain;
@@ -287,13 +302,20 @@
     align-self: stretch;
 }
 
+#teams .stats {
+    padding: 0;
+}
+
+#teams .stats-area {
+    padding: 80px 20px 20px;
+}
+
 #teams .stats-close {
     display: none;
 }
 
 .matchup-card {
-    background: #f4f4f4;
-    /* border: 2px solid #111; */
+    background: rgba(255, 255, 255, 0.7);
     border-radius: 16px;
     padding: 10px;
     display: flex;
@@ -393,11 +415,6 @@
     font-size: 10px;
     font-weight: 700;
     color: #333;
-}
-
-.matchup-slot:hover .matchup-tooltip,
-.matchup-slot:focus-within .matchup-tooltip {
-    opacity: 1;
 }
 
 .matchup-card.win .matchup-slot {
@@ -769,4 +786,252 @@
 
 .evolution-grid path {
     stroke: none;
+}
+
+#players .stats-area {
+  align-items: stretch;
+  justify-content: flex-start;
+  position: relative;
+}
+
+#players .stats-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 10;
+  color: rgba(255,255,255,0.7);
+}
+
+#players .stats-close:hover {
+  color: white;
+}
+
+.player-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding-top: 90px;
+}
+
+.player-top {
+  flex: none;
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.player-image-col {
+  flex: 0 0 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 8px 10px;
+}
+
+.player-image-placeholder {
+  width: 110px;
+  height: 110px;
+}
+
+.player-stats-col .name {
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+}
+
+.player-stats-col,
+.player-cal-col {
+  padding: 12px 16px;
+  border-left: 1px solid rgba(255,255,255,0.08);
+}
+
+.player-stats-col { flex: 1; }
+.player-cal-col   { flex: 2; }
+
+.player-stats-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.player-cal-col {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.player-averages {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.avg-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 52px;
+  padding: 4px 8px;
+}
+
+.avg-num {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: white;
+  font-variant-numeric: tabular-nums;
+}
+
+.avg-label {
+  margin-top: 2px;
+  font-size: 9px;
+  color: rgba(255,255,255,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+#player-calendar {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+#player-calendar > *,
+#player-calendar svg {
+  background: transparent !important;
+}
+
+#player-calendar svg {
+  overflow: visible;
+}
+
+#player-calendar text,
+#player-calendar tspan {
+  fill: rgba(255,255,255,0.4) !important;
+  font-family: sans-serif !important;
+  font-size: 9px !important;
+}
+
+.player-bottom {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.player-bottom-left,
+.player-bottom-center,
+.player-bottom-right {
+  display: flex;
+  overflow: hidden;
+}
+
+.player-bottom-left {
+  flex: 0 0 45%;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+.player-bottom-left #player-chart {
+  width: 100%;
+  height: 100%;
+  max-width: 600px;
+}
+
+.player-bottom-center {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+.player-bottom-right {
+  flex: 0 0 28%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+#player-games-chart {
+  display: block;
+  width: 100%;
+  height: 140px;
+}
+
+.game-popup {
+  position: absolute;
+  display: none;
+  width: 300px;
+  padding: 14px 16px;
+  z-index: 200;
+  background: #ffffffc3;
+  border: 1px solid rgba(0,0,0,0.1);
+  pointer-events: auto;
+}
+
+.popup-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  color: rgba(0,0,0,0.35);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.popup-close:hover {
+  color: #111;
+}
+
+.popup-matchup {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 2px;
+  padding-right: 22px;
+}
+
+.popup-wl { font-size: 13px; font-weight: 700; }
+.popup-win  { color: #31e77d; }
+.popup-loss { color: #ee5847; }
+.popup-opp  { font-size: 13px; font-weight: 500; color: #111; }
+.popup-score { margin-left: auto; font-size: 11px; color: rgba(0,0,0,0.45); }
+.popup-date  { margin-bottom: 10px; font-size: 10px; color: rgba(0,0,0,0.4); }
+
+.popup-stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.popup-stat {
+  flex: 1;
+  min-width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 0;
+}
+
+.popup-stat-num {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111;
+  font-variant-numeric: tabular-nums;
+}
+
+.popup-stat-lbl {
+  font-size: 8px;
+  color: rgba(0,0,0,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }

@@ -786,7 +786,7 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
     .attr("fill", "transparent")
     .style("cursor", "crosshair");
 
-  const bisect = d3.bisector((d) => d.index).left;
+  // const bisect = d3.bisector((d) => d.index).left;
 
   function showTooltip(d) {
     if (!tooltip) return;
@@ -1012,6 +1012,9 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   const teamName = seasonsLoader.getData(currentYear, (row) => row["teamName"]).get(teamId);
   const displayName = [teamCity, teamName].filter(Boolean).join(" ");
 
+  const logoNameEl = container.querySelector(".logo-team-name");
+  if (logoNameEl) logoNameEl.textContent = displayName || teamAbbrev || "";
+
   if (logo) {
     if (teamSlug) {
       const activeTill = getMetaValue(metadataLoader, teamId, (row) => row["seasonActiveTill"], currentYear);
@@ -1068,6 +1071,9 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   const color3 = getMetaValue(metadataLoader, teamId, (row) => row["Color3"], currentYear);
   const colorA = resolveColor(rawColorA, resolveColor(color3, "#CC333F"));
   const colorB = resolveColor(rawColorB, resolveColor(color3, "rgba(80, 80, 80, 0.7)"));
+  const statsArea = container.querySelector(".stats-area");
+  if (statsArea) statsArea.style.background = colorA;
+
   if (legendTeam) {
     legendTeam.style.color = colorA;
   }
@@ -1097,24 +1103,6 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
 
   updateEvolutionChart(container, currentYear, teamId, built);
   updateMatchups(container, currentYear, teamId, metadataLoader, gameType);
-}
-];
-
-export function updateTeamStats(container, seasonsLoader, metadataLoader, currentYear, teamId) {
-  const name = container.querySelector(".name");
-  const year = container.querySelector(".year");
-  const content = container.querySelector(".content");
-
-  name.innerText = metadataLoader.getValue(teamId, (row) => row["teamAbbrev"]);
-  year.innerText = currentYear;
-
-  let attributes = [TEAM_ATTRIBUTES[0], TEAM_ATTRIBUTES[1]];
-  let attributesParse = attributes.map((a) => a[1]);
-  let attributesDisplay = attributes.map((a) => a[0]);
-  let seasonData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...attributesParse));
-
-  let teamData = seasonData.get(teamId);
-  content.innerText = attributesDisplay.map((display, index) => display + ": " + teamData[index]).join("\n");
 }
 
 const _gamesCache = new Map();
@@ -1344,7 +1332,6 @@ function renderGamesChart(svgEl, games) {
 }
 
 export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId, gameType = "Regular Season") {
-  // example use of the system
   const name = container.querySelector(".name");
   const year = container.querySelector(".year");
   const content = container.querySelector(".content");
@@ -1371,15 +1358,10 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
   let dataPoints = [radarFullAttributes.map((attr, i) => {
     return { axis: i, value: playerRadarData[i], rawValue: playerRawData[i], axisName: attr[0] };
   })];
-  built.radar.update(dataPoints, TRANSITION_TIME, built)
-}
+  built.radar.update(dataPoints, TRANSITION_TIME, built);
 
-export function updatePlayerStats(container, seasonsLoader, metadataLoader, currentYear, playerId) {
-  container.querySelector('.name').innerText =
-    metadataLoader.getValue(playerId, r => r['firstName'] + ' ' + r['lastName']);
-
-  const statsArea = container.querySelector('.stats-area');
-
+  // games, calendar, shot chart
+  const statsArea = container.querySelector('.stats-area') || container;
   if (!statsArea.dataset.popupListener) {
     statsArea.dataset.popupListener = '1';
     statsArea.addEventListener('click', e => {
@@ -1390,7 +1372,9 @@ export function updatePlayerStats(container, seasonsLoader, metadataLoader, curr
     });
   }
 
-  const chartEl = document.getElementById("player-chart");
+  const chartEl = document.getElementById("#player-chart");
+  if (!chartEl) return;
+
   const loadingSvg = d3.select(chartEl);
   loadingSvg.selectAll("*").remove();
   loadingSvg.attr("viewBox", "0 0 601 444").attr("preserveAspectRatio", "xMidYMid meet");
@@ -1415,7 +1399,8 @@ export function updatePlayerStats(container, seasonsLoader, metadataLoader, curr
 
     renderAverages(container.querySelector('.player-averages'), games);
     renderCalendarHeatmap(games, currentYear, statsArea);
-    renderGamesChart(document.getElementById('player-games-chart'), games);
+    renderGamesChart(document.getElementById('#player-games-chart'), games);
+    if (gamesChart) renderGamesChart(gamesChart, games);
 
     if (shots !== null) drawShotChart(chartEl, shots);
   }).catch(() => {
