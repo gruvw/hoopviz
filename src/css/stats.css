@@ -200,7 +200,7 @@
     justify-content: space-between;
     align-items: baseline;
     gap: 8px;
-    font-size: 12px;
+    font-size: 14px;
     color: #444;
 }
 
@@ -830,7 +830,6 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 25px;
   padding: 12px 10px 10px;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(0, 0, 0, 0.15);
@@ -857,13 +856,13 @@
 }
 
 .player-name-label {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: #111;
   text-align: center;
   line-height: 1.2;
   word-break: break-word;
-  margin-top: -8px;
+  margin-top: 17px;
 }
 
 .player-radar-card {
@@ -878,7 +877,7 @@
 }
 
 .player-stats-col {
-  flex: 2;
+  flex: 1.5;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -908,8 +907,9 @@
 
 .player-averages {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 
 .avg-item {
@@ -988,7 +988,7 @@
 
 .shot-chart-attribution {
   position: absolute;
-  bottom: 10px;
+  bottom: 7px;
   left: 0;
   right: 0;
   font-size: 10px;
