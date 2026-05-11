@@ -60,6 +60,47 @@ export class MetadataLoader {
     return null;
   }
 
+  getRowForSeason(key, year) {
+    let firstMatch = null;
+    let hasSeasonInfo = false;
+
+    for (const row of this.#data) {
+      if (this.keyName(row) !== key) continue;
+
+      if (!firstMatch) {
+        firstMatch = row;
+      }
+
+      if (year == null) {
+        return row;
+      }
+
+      const start = parseInt(row.seasonFounded, 10);
+      const end = parseInt(row.seasonActiveTill, 10);
+
+      if (!Number.isNaN(start) && !Number.isNaN(end)) {
+        hasSeasonInfo = true;
+        if (year >= start && year <= end) {
+          return row;
+        }
+      }
+    }
+
+    // if the entity has season-bounded rows but none matched, the team didn't exist that year
+    // return null rather than a wrong identity. entities without season info fall back to firstMatch.
+    if (year != null && hasSeasonInfo) {
+      return null;
+    }
+
+    return firstMatch;
+  }
+
+  getValueForSeason(key, attribute, year) {
+    const row = this.getRowForSeason(key, year);
+    if (!row) return null;
+    return attribute(row);
+  }
+
   getAttributes() {
     if (this.#data.length === 0) {
       return [];

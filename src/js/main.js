@@ -7,7 +7,7 @@ import * as Stats from "./stats.js";
 new Screens({
   containerSelector: "#screens",
   screenSelector: "#screen-select",
-  minYear: 1985,
+  minYear: 1990,
   maxYear: 2025,
   // teams BubbleMap
   leftBubbleMap: new BubbleMap({
@@ -15,9 +15,10 @@ new Screens({
     seasonsLoader: new SeasonsLoader("./data/team_seasons.csv", (row) => row["teamId"]),
     metadataLoader: new MetadataLoader("./data/team_metadata.csv", (row) => row["teamId"]),
     bubbleContent: (row) => row["teamAbbrev"],
-    bubbleColor: (row) => row["Color1"],
+    bubbleLogo: (row) => row["teamSlug"],
     statsUpdate: Stats.updateTeamStats,
     attributes: Stats.TEAM_ATTRIBUTES,
+    build: Stats.makeRadarBuild("#team-radar", { size: 170, margin: 70 }),
   }),
   // players BubbleMap
   rightBubbleMap: new BubbleMap({
@@ -28,5 +29,6 @@ new Screens({
     bubbleColor: (row) => "#005ce6",
     statsUpdate: Stats.updatePlayerStats,
     attributes: Stats.PLAYER_ATTRIBUTES,
+    build: Stats.makeRadarBuild("#player-radar", { size: 240, margin: 90 }),
   }),
 })

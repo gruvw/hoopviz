@@ -26,6 +26,7 @@ export class Screens {
 
   async init() {
     this.setupSlider();
+    this.setupGameTypeToggle();
     this.bindMapEvents();
 
     await this.leftBubbleMap.ready;
@@ -39,6 +40,28 @@ export class Screens {
     //     .querySelectorAll(".bubble:not(.measure-bubble)")
     //     .forEach((b) => b.classList.add("transition"));
     // }, 200);
+  }
+
+  setupGameTypeToggle() {
+    const toggle = document.querySelector("#game-type-select");
+    if (!toggle) return;
+    toggle.querySelectorAll("span").forEach((span) => {
+      span.addEventListener("click", () => {
+        if (span.classList.contains("selected")) return;
+        toggle.querySelectorAll("span").forEach((s) => s.classList.remove("selected"));
+        span.classList.add("selected");
+        const gameType = span.dataset.gameType;
+        this.bubbleMaps.forEach((m) => m.updateGameType(gameType));
+        // playoffs don't exist for every year, snap to the most recent valid one if needed
+        const yearsWithData = this.leftBubbleMap.seasonsLoader.getYearsForGameType(gameType);
+        const currentYear = parseFloat(this.slider.value);
+        if (yearsWithData.length > 0 && !yearsWithData.includes(currentYear)) {
+          this.slider.value = yearsWithData[yearsWithData.length - 1];
+          // dispatch so the label and both bubble maps update through the normal path
+          this.slider.dispatchEvent(new Event("input"));
+        }
+      });
+    });
   }
 
   updateScreens() {
@@ -79,9 +102,6 @@ export class Screens {
     // slider
     this.slider.addEventListener("input", () => {
       this.updateThumbLabel();
-      if (this.statsItem != null) {
-        this.statsUpdate(this.stats, this.seasonsLoader, this.slider.value, this.statsItem);
-      }
       this.updateScreens();
     });
 

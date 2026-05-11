@@ -6,6 +6,7 @@ export class BubbleMap {
   MAX_ZOOM = 15;
   MIN_ZOOM = 1;
   DRAG_THRESHOLD = 5;
+  LOGO_BUBBLE_SCALE = 1.2;
 
   MAX_RANK_FILTER = 50;
 
@@ -14,11 +15,12 @@ export class BubbleMap {
     this.container = document.querySelector(options.containerSelector);
     this.seasonsLoader = options.seasonsLoader;
     this.containerIdPrefix = `${this.container.id}-`;
-    this.statsUpdate = options.statsUpdate;
+    this.statsUpdate = () => options.statsUpdate(this.stats, this.built, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem, this.gameType);
 
     this.metadataLoader = options.metadataLoader;
     this.bubbleContent = options.bubbleContent;
     this.bubbleColor = options.bubbleColor;
+    this.bubbleLogo = options.bubbleLogo;
 
     // DOM elements
     this.viewport = this.container.querySelector(".viewport");
@@ -54,6 +56,9 @@ export class BubbleMap {
 
     this.statsItem = null;
     this.currentYear = null;
+    this.gameType = "Regular Season";
+
+    this.built = options.build([this.attributeY, this.attributeSize, this.attributeX], this.attributes, this.statsUpdate);
 
     this.ready = this.init();
   }
@@ -162,10 +167,17 @@ export class BubbleMap {
     this.currentYear = year;
 
     if (this.statsItem != null) {
-        this.statsUpdate(this.stats, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem);
+      this.statsUpdate();
     }
 
     this.updateBubbles();
+  }
+
+  updateGameType(gameType) {
+    this.gameType = gameType;
+    this.seasonsLoader.setGameType(gameType);
+    this.updateBubbles();
+    if (this.statsItem != null) this.statsUpdate();
   }
 
   updateBubbles() {
@@ -195,17 +207,34 @@ export class BubbleMap {
       Data.min_max_norm_shaper,
     ], null);
 
+    const metaById = new Map();
+    const filteredData = new Map();
+    data.forEach((values, itemId) => {
+      const meta = this.getBubbleMeta(itemId);
+      metaById.set(itemId, meta);
+      // drop entities with no metadata — they'd render as blank invisible bubbles
+      if (meta.bubbleContent || meta.bubbleColor || meta.bubbleLogo) {
+        filteredData.set(itemId, values);
+      }
+    });
+    data = filteredData;
+
     const items = [...data.keys()];
     // console.log(JSON.stringify(Object.fromEntries(data)));
 
-    this.createBubbles(items);
+    this.createBubbles(items, metaById);
 
     const positions = {}
     data.forEach((values, itemId) => {
+      const meta = metaById.get(itemId) || {};
+      const isLogo = !!meta.bubbleLogo || (meta.bubbleColor && meta.bubbleColor.includes("url"));
+      const baseSize = values[2] * 0.7 + 0.2;
+      const scaledSize = isLogo ? baseSize * this.LOGO_BUBBLE_SCALE : baseSize;
+
       positions[itemId] = {
         targetX: values[0],
         targetY: values[1],
-        size: values[2] * 0.7 + 0.2,
+        size: scaledSize,
       };
     });
 
@@ -231,7 +260,52 @@ export class BubbleMap {
     });
   }
 
-  createBubbles(items) {
+  getMetaValue(itemId, getter) {
+    if (typeof getter !== "function") return null;
+    return this.metadataLoader.getValueForSeason(itemId, getter, this.currentYear);
+  }
+
+  getBubbleMeta(itemId) {
+    const bubbleContent = this.getMetaValue(itemId, this.bubbleContent);
+    const bubbleColor = this.getMetaValue(itemId, this.bubbleColor);
+    const bubbleLogo = this.getMetaValue(itemId, this.bubbleLogo);
+    return { bubbleContent, bubbleColor, bubbleLogo };
+  }
+
+  getLogoUrl(itemId, bubbleLogo) {
+    const activeTill = this.getMetaValue(itemId, (row) => row["seasonActiveTill"]);
+    const activeTillYear = parseInt(activeTill, 10);
+    // use the last active year for historical logos; logocdn.com uses "current" for anything after 2024
+    const logoYear = Number.isNaN(activeTillYear) ? this.currentYear : activeTillYear;
+    const logoYearSegment = logoYear > 2024 ? "current" : logoYear;
+    return `https://i.logocdn.com/nba/${logoYearSegment}/${bubbleLogo}.svg`;
+  }
+
+  updateBubbleContent(bubble, itemId, meta = null) {
+    const { bubbleContent, bubbleColor, bubbleLogo } = meta || this.getBubbleMeta(itemId);
+
+    bubble.classList.remove("bubble-logo");
+    bubble.style.background = "";
+    bubble.textContent = "";
+    bubble.querySelectorAll(".bubble-logo-img").forEach((img) => img.remove());
+
+    if (bubbleLogo) {
+      bubble.classList.add("bubble-logo");
+      const logo = document.createElement("img");
+      logo.className = "bubble-logo-img";
+      logo.src = this.getLogoUrl(itemId, bubbleLogo);
+      logo.alt = bubbleContent || "";
+      logo.decoding = "async";
+      logo.loading = "lazy";
+      bubble.appendChild(logo);
+      return;
+    }
+
+    bubble.textContent = bubbleContent || "";
+    bubble.style.background = bubbleColor || "";
+  }
+
+  createBubbles(items, metaById) {
     const itemsSet = new Set(items);
 
     const existingBubbles = this.bubblesContainer.querySelectorAll(".bubble:not(.measure-bubble)");
@@ -241,6 +315,7 @@ export class BubbleMap {
       const itemId = bubble.id.replace(this.containerIdPrefix, "");
 
       if (itemsSet.has(itemId)) {
+        this.updateBubbleContent(bubble, itemId, metaById?.get(itemId));
         itemsSet.delete(itemId);
         if (bubble.style.getPropertyValue("--visible") === "0") {
           // disable transitioning from past position for ghost bubbles
@@ -262,10 +337,10 @@ export class BubbleMap {
       const bubble = document.createElement("button");
       bubble.className = "bubble";
       bubble.classList.add("transition");
+
       bubble.id = `${this.containerIdPrefix}${item}`;
 
-      bubble.textContent = this.metadataLoader.getValue(item, this.bubbleContent);
-      bubble.style.background = this.metadataLoader.getValue(item, this.bubbleColor);
+      this.updateBubbleContent(bubble, item, metaById?.get(item));
 
       bubble.addEventListener("click", (e) => {
         if (this.dragHasMoved) return;
@@ -276,6 +351,7 @@ export class BubbleMap {
         this.statsArea.style.background = bubble.style.background;
 
         this.stats.classList.add("active");
+        this.statsUpdate();
       });
 
       this.bubblesContainer.appendChild(bubble);
@@ -313,6 +389,13 @@ export class BubbleMap {
                 setter(randomNewAttr);
               }
             });
+
+            this.built.bubbleMapAttributes = [this.attributeY, this.attributeSize, this.attributeX];
+            this.built.radarAttributes = this.built.radarAttributes.map((a) => this.built.bubbleMapAttributes.includes(a) ? null : a);
+            const missingCount = this.built.radarAttributes.filter(item => item === null).length;
+            const missings = Utils.pickItemsWithout(this.attributes, this.built.radarAttributes.concat(this.built.bubbleMapAttributes), missingCount);
+            var i = 0;
+            this.built.radarAttributes = this.built.radarAttributes.map((a) => a == null ? missings[i++] : a);
 
             this.updateSelectors();
             this.updateBubbles();
@@ -410,8 +493,16 @@ export class BubbleMap {
         this.closeStats()
       }
     });
+    // re-render after the slide-in animation so charts have the correct dimensions to draw into
+    this.stats.addEventListener("transitionend", (e) => {
+      if (e.propertyName !== "transform") return;
+      if (!this.stats.classList.contains("active")) return;
+      if (this.statsItem == null) return;
+      this.statsUpdate();
+    });
     this.statsArea.addEventListener("click", (e) => {
       e.stopPropagation();
+      document.querySelectorAll(".radar-selector").forEach(e => e.style.display = "none");
     });
 
     // selectors
