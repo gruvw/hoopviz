@@ -6,8 +6,8 @@
     flex-direction: column;
 
     width: 100%;
-    max-height: calc(100% - 40px);
-    height: calc(100% - 40px);
+    /* max-height: calc(100% - 40px); */
+    height: 100%;
 
     position: relative;
     gap: 5px;
@@ -307,7 +307,7 @@
 }
 
 #teams .stats-area {
-    padding: 80px 20px 20px;
+    padding: 80px 20px 50px;
 }
 
 #teams .stats-close {
