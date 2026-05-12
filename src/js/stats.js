@@ -2,8 +2,7 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { RadarChart } from "./radar_chart/radarChart.js";
 import * as Utils from "./utils.js";
 import * as Data from "./data.js";
-
-// TODO set all attributes
+import { drawShotChart, loadShots } from "./ShotChart.js";
 
 export const TEAM_ATTRIBUTES = [
   // [display name, row to value function]
@@ -787,7 +786,7 @@ async function updateEvolutionChart(container, currentYear, teamId, built) {
     .attr("fill", "transparent")
     .style("cursor", "crosshair");
 
-  const bisect = d3.bisector((d) => d.index).left;
+  // const bisect = d3.bisector((d) => d.index).left;
 
   function showTooltip(d) {
     if (!tooltip) return;
@@ -1013,6 +1012,9 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   const teamName = seasonsLoader.getData(currentYear, (row) => row["teamName"]).get(teamId);
   const displayName = [teamCity, teamName].filter(Boolean).join(" ");
 
+  const logoNameEl = container.querySelector(".logo-team-name");
+  if (logoNameEl) logoNameEl.textContent = displayName || teamAbbrev || "";
+
   if (logo) {
     if (teamSlug) {
       const activeTill = getMetaValue(metadataLoader, teamId, (row) => row["seasonActiveTill"], currentYear);
@@ -1069,6 +1071,9 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   const color3 = getMetaValue(metadataLoader, teamId, (row) => row["Color3"], currentYear);
   const colorA = resolveColor(rawColorA, resolveColor(color3, "#CC333F"));
   const colorB = resolveColor(rawColorB, resolveColor(color3, "rgba(80, 80, 80, 0.7)"));
+  const statsArea = container.querySelector(".stats-area");
+  if (statsArea) statsArea.style.background = colorA;
+
   if (legendTeam) {
     legendTeam.style.color = colorA;
   }
@@ -1100,24 +1105,281 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   updateMatchups(container, currentYear, teamId, metadataLoader, gameType);
 }
 
+const _gamesCache = new Map();
+let playerStatsReqId = 0;
+let calInstance = null;
+let gamesByDate = new Map();
+
+async function loadPlayerGames(personId) {
+  if (_gamesCache.has(personId)) return _gamesCache.get(personId);
+  const rows = await d3.csv(`data/games_by_player/${personId}.csv`);
+  _gamesCache.set(personId, rows);
+  return rows;
+}
+
+function colAvg(rows, field) {
+  const vals = rows.map(r => +r[field]).filter(v => isFinite(v));
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+}
+
+function fmt(v, d = 1) {
+  return isFinite(+v) ? (+v).toFixed(d) : '--';
+}
+
+function fmtPM(v) {
+  const n = +v;
+  return !isFinite(n) ? '--' : (n >= 0 ? '+' : '') + n.toFixed(1);
+}
+
+function fmtDate(str) {
+  if (!str) return '--';
+  const d = new Date(str);
+  return isNaN(d) ? str.slice(0, 10) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function renderAverages(el, games) {
+  el.innerHTML = '';
+  if (!games.length) return;
+  const wins = games.filter(r => +r.win === 1).length;
+  const defs = [
+    ['Games played', games.length, null],
+    ['Record', `${wins}–${games.length - wins}`, null],
+    ['Points per game', colAvg(games, 'points'), 1],
+    ['Rebounds per game', colAvg(games, 'reboundsTotal'), 1],
+    ['Assists per game', colAvg(games, 'assists'), 1],
+    ['Steals per game', colAvg(games, 'steals'), 1],
+    ['Blocks per game', colAvg(games, 'blocks'), 1],
+    ['Field goal %', colAvg(games, 'fieldGoalsPercentage') * 100, 1],
+    ['Three point %', colAvg(games, 'threePointersPercentage') * 100, 1],
+    ['Plus / minus', fmtPM(colAvg(games, 'plusMinusPoints')), null],
+  ];
+  defs.forEach(([label, val, dec]) => {
+    const item = document.createElement('div');
+    item.className = 'summary-item';
+    const lbl = document.createElement('span');
+    lbl.className = 'summary-label';
+    lbl.textContent = label;
+    const num = document.createElement('span');
+    num.className = 'summary-value';
+    num.textContent = dec !== null ? fmt(val, dec) : val;
+    item.append(lbl, num);
+    el.append(item);
+  });
+}
+
+function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285') {
+  if (calInstance) {
+    try { calInstance.destroy(); } catch (e) {}
+    calInstance = null;
+  }
+
+  gamesByDate = new Map();
+  const source = [];
+  games.forEach(r => {
+    const dateStr = r.gameDateTimeEst ? r.gameDateTimeEst.slice(0, 10) : null;
+    if (!dateStr) return;
+    gamesByDate.set(dateStr, r);
+    source.push({ date: dateStr, value: +r.points });
+  });
+
+  const maxPts = d3.max(games, d => +d.points) || 40;
+
+  try {
+    calInstance = new window.CalHeatmap();
+
+    calInstance.on('mouseover', (event, timestamp, value) => {
+      if (value == null) return;
+      const d = new Date(timestamp);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (event.target?.tagName === 'rect') {
+        event.target.style.stroke = color;
+        event.target.style.strokeWidth = '2px';
+      }
+      d3.select('#player-games-chart').selectAll('rect')
+        .filter(d => d?.gameDateTimeEst?.slice(0, 10) === dateStr)
+        .attr('fill', color);
+      const game = gamesByDate.get(dateStr);
+      if (game) showGamePopup(event, game, statsAreaEl);
+    });
+
+    calInstance.on('mouseout', (event, timestamp, value) => {
+      if (event.target?.tagName === 'rect') {
+        event.target.style.stroke = '';
+        event.target.style.strokeWidth = '';
+      }
+      d3.select('#player-games-chart').selectAll('rect')
+        .attr('fill', d => d && +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
+      const popup = statsAreaEl.querySelector('.game-popup');
+      if (popup) popup.style.display = 'none';
+    });
+
+    calInstance.paint({
+      itemSelector: '#player-calendar',
+      data: {
+        source,
+        x: 'date',
+        y: 'value',
+        defaultValue: null,
+      },
+      date: { start: new Date(currentYear, 9, 1) },
+      range: 9,
+      domain: {
+        type: 'month',
+        gutter: 6,
+        label: { text: 'MMM', position: 'top' },
+      },
+      subDomain: {
+        type: 'ghDay',
+        radius: 2,
+        width: 14,
+        height: 14,
+        gutter: 2,
+      },
+      scale: {
+        color: {
+          range: ['#ffffff', color],
+          type: 'linear',
+          domain: [0, maxPts],
+        },
+      },
+      theme: 'dark',
+    });
+  } catch (e) {
+    console.error('CalHeatmap error:', e);
+  }
+}
+
+function showGamePopup(event, game, statsAreaEl) {
+  let popup = statsAreaEl.querySelector('.game-popup');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.className = 'game-popup';
+    statsAreaEl.appendChild(popup);
+  }
+
+  const opp = [game.opponentteamCity, game.opponentteamName].filter(Boolean).join(' ') || '--';
+  const won = +game.win === 1;
+  const wl = won ? 'Win' : 'Loss';
+  const ha = +game.home === 1 ? 'vs' : '@';
+  const score = (game.homeScore && game.awayScore) ? `${game.homeScore}–${game.awayScore}` : '';
+
+  popup.innerHTML = `
+    <div class="popup-matchup">
+      <span class="popup-wl ${won ? 'popup-win' : 'popup-loss'}">${wl}</span>
+      <span class="popup-opp">${ha} ${opp}</span>
+      ${score ? `<span class="popup-score">${score}</span>` : ''}
+    </div>
+    <div class="popup-date">${fmtDate(game.gameDateTimeEst)}</div>
+    <div class="popup-stats-grid">
+      ${[
+        ['MIN', isFinite(+game.numMinutes) ? Math.round(+game.numMinutes) : '--'],
+        ['PTS', game.points],
+        ['REB', game.reboundsTotal],
+        ['AST', game.assists],
+        ['STL', game.steals],
+        ['BLK', game.blocks],
+        ['+/-', fmtPM(+game.plusMinusPoints)],
+        ['FG%', (+game.fieldGoalsPercentage * 100).toFixed(1)],
+        ['3P%', (+game.threePointersPercentage * 100).toFixed(1)],
+        ['FT%', (+game.freeThrowsPercentage * 100).toFixed(1)],
+      ].map(([l, v]) => `<div class="popup-stat"><span class="popup-stat-num">${v}</span><span class="popup-stat-lbl">${l}</span></div>`).join('')}
+    </div>
+  `;
+
+  const areaRect = statsAreaEl.getBoundingClientRect();
+  let left = event.clientX - areaRect.left + 12;
+  let top  = event.clientY - areaRect.top  + 12;
+  if (left + 264 > areaRect.width  - 8) left = event.clientX - areaRect.left - 276;
+  if (top  + 200 > areaRect.height - 8) top  = event.clientY - areaRect.top  - 212;
+
+  popup.style.cssText = `display:block; left:${Math.max(8, left)}px; top:${Math.max(8, top)}px; transform:none;`;
+}
+
+function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+  if (!games.length) return;
+
+  const rect = svgEl.getBoundingClientRect();
+  const W = rect.width  || 380;
+  const H = rect.height || 160;
+  const m = { top: 16, right: 12, bottom: 22, left: 30 };
+  const iW = W - m.left - m.right;
+  const iH = H - m.top  - m.bottom;
+
+  svg.attr('viewBox', `0 0 ${W} ${H}`).attr('preserveAspectRatio', 'xMidYMid meet');
+  const g = svg.append('g').attr('transform', `translate(${m.left},${m.top})`);
+
+  const maxPts = d3.max(games, d => +d.points) || 1;
+  const x = d3.scaleBand().domain(d3.range(games.length)).range([0, iW]).padding(0.1);
+  const y = d3.scaleLinear().domain([0, maxPts]).range([iH, 0]);
+
+  g.selectAll('rect')
+    .data(games)
+    .join('rect')
+    .attr('x', (_, i) => x(i))
+    .attr('y', d => y(+d.points))
+    .attr('width', x.bandwidth())
+    .attr('height', d => iH - y(+d.points))
+    .attr('fill', d => +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)')
+    .on('mouseover', function(event, d) {
+      d3.select(this).attr('fill', teamColor);
+      const dateStr = d?.gameDateTimeEst?.slice(0, 10);
+      if (dateStr) {
+        const ts = new Date(dateStr).getTime();
+        const calRect =
+          document.querySelector(`#player-calendar rect[data-date="${dateStr}"]`) ||
+          document.querySelector(`#player-calendar rect[data-date="${ts}"]`);
+        if (calRect) {
+          calRect.style.stroke = teamColor;
+          calRect.style.strokeWidth = '2px';
+        }
+        const game = gamesByDate.get(dateStr);
+        const statsAreaEl = svgEl.closest('.stats-area');
+        if (game && statsAreaEl) showGamePopup(event, game, statsAreaEl);
+      }
+    })
+    .on('mouseout', function(event, d) {
+      d3.select(this).attr('fill', +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
+      document.querySelectorAll('#player-calendar [data-date]').forEach(el => {
+        el.style.stroke = '';
+        el.style.strokeWidth = '';
+      });
+      const statsAreaEl = svgEl.closest('.stats-area');
+      const popup = statsAreaEl?.querySelector('.game-popup');
+      if (popup) popup.style.display = 'none';
+    });
+
+  g.append('line')
+    .attr('x1', 0).attr('y1', iH).attr('x2', iW).attr('y2', iH)
+    .attr('stroke', 'rgba(0,0,0,0.1)').attr('stroke-width', 1);
+
+  [0, maxPts].forEach(v => {
+    g.append('text')
+      .attr('x', -4).attr('y', y(v) + (v === 0 ? 0 : 4))
+      .attr('text-anchor', 'end').attr('font-size', 9)
+      .attr('fill', 'rgba(0,0,0,0.4)')
+      .text(v);
+  });
+
+  g.append('text')
+    .attr('x', iW / 2).attr('y', iH + 16)
+    .attr('text-anchor', 'middle').attr('font-size', 9)
+    .attr('fill', 'rgba(0,0,0,0.4)')
+    .text('PTS per game');
+}
+
 export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId, gameType = "Regular Season") {
-  // example use of the system
   const name = container.querySelector(".name");
-  const year = container.querySelector(".year");
-  const content = container.querySelector(".content");
+  const playerName = getMetaValue(metadataLoader, playerId, (row) => row["firstName"] + " " + row["lastName"], currentYear);
+  name.innerText = playerName;
 
-  name.innerText = getMetaValue(metadataLoader, playerId, (row) => row["firstName"] + " " + row["lastName"], currentYear);
-  year.innerText = currentYear;
-
-  const attributes = PLAYER_ATTRIBUTES;
-  const attributesParse = attributes.map((a) => a[1]);
-  const attributesDisplay = attributes.map((a) => a[0]);
-  const seasonData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...attributesParse));
-
-  const playerData = seasonData.get(playerId) || [];
-  content.innerText = attributesDisplay
-    .map((display, index) => `${display}: ${formatValue(playerData[index])}`)
-    .join("\n");
+  const headshot = container.querySelector(".player-headshot");
+  if (headshot) {
+    headshot.src = `https://cdn.nba.com/headshots/nba/latest/1040x760/${playerId}.png`;
+    headshot.hidden = false;
+    headshot.onerror = () => { headshot.hidden = true; };
+  }
 
   // radar chart
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
@@ -1128,5 +1390,84 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
   let dataPoints = [radarFullAttributes.map((attr, i) => {
     return { axis: i, value: playerRadarData[i], rawValue: playerRawData[i], axisName: attr[0] };
   })];
-  built.radar.update(dataPoints, TRANSITION_TIME, built)
+  built.radar.update(dataPoints, TRANSITION_TIME, built);
+
+  // games, calendar, shot chart
+  const statsArea = container.querySelector('.stats-area') || container;
+
+  const chartEl = document.getElementById("player-chart");
+  if (!chartEl) return;
+
+  const loadingSvg = d3.select(chartEl);
+  loadingSvg.selectAll("*").remove();
+  loadingSvg.attr("viewBox", "0 0 601 444").attr("preserveAspectRatio", "xMidYMid meet");
+  loadingSvg.append("image").attr("href", "data/nba-court.svg").attr("width", 601).attr("height", 444);
+  loadingSvg.append("text")
+    .attr("x", 300).attr("y", 222)
+    .attr("text-anchor", "middle")
+    .attr("fill", "#ffffff").attr("font-size", 16)
+    .text("Loading...");
+
+  const reqId = ++playerStatsReqId;
+
+  loadShots(playerId, currentYear, gameType).then(shots => {
+    if (reqId !== playerStatsReqId) return;
+    if (shots !== null) drawShotChart(chartEl, shots);
+  }).catch(() => {
+    if (reqId !== playerStatsReqId) return;
+    d3.select(chartEl).selectAll('*').remove();
+    d3.select(chartEl)
+      .attr("viewBox", "0 0 601 444").attr("preserveAspectRatio", "xMidYMid meet")
+      .append("text")
+        .attr("x", 300).attr("y", 222)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#ffffff").attr("font-size", 16)
+        .text("No shot data");
+  });
+
+  Promise.all([
+    loadPlayerGames(playerId),
+    loadCsv('./data/team_seasons.csv'),
+    loadCsv('./data/team_metadata.csv'),
+  ]).then(([allGames, teamSeasons, teamMeta]) => {
+    if (reqId !== playerStatsReqId) return;
+
+    const games = allGames
+      .filter(r => +r.season === +currentYear && r.gameType === gameType)
+      .sort((a, b) => new Date(a.gameDateTimeEst || 0) - new Date(b.gameDateTimeEst || 0));
+
+    const teamCounts = new Map();
+    games.filter(r => r.playerteamName).forEach(r => {
+      const key = `${r.playerteamCity}|${r.playerteamName}`;
+      teamCounts.set(key, (teamCounts.get(key) || 0) + 1);
+    });
+    const topTeamKey = [...teamCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (topTeamKey) {
+      const [city, name] = topTeamKey.split('|');
+      const teamRow = teamSeasons.find(r => +r.season === +currentYear && r.teamName === name && r.teamCity === city);
+      const metaRow = teamRow ? teamMeta.find(r => r.teamId === String(teamRow.teamId)) : null;
+      if (metaRow) {
+        const colorA = resolveColor(metaRow.Color1, resolveColor(metaRow.Color3, '#005ce6'));
+        const colorB = resolveColor(metaRow.Color2, resolveColor(metaRow.Color3, 'rgba(80,80,80,0.7)'));
+        statsArea.style.background = colorA;
+        const teamLogoEl = container.querySelector('.player-team-logo');
+        if (teamLogoEl && metaRow.teamSlug) {
+          const activeTill = parseInt(metaRow.seasonActiveTill, 10);
+          const logoYearSeg = (!isNaN(activeTill) && activeTill <= 2024) ? activeTill : 'current';
+          teamLogoEl.src = `https://i.logocdn.com/nba/${logoYearSeg}/${metaRow.teamSlug}.svg`;
+          teamLogoEl.hidden = false;
+        }
+        built.colors = [colorA, colorB];
+        built.radar.update(dataPoints, 0, built);
+        renderAverages(container.querySelector('.player-averages'), games);
+        renderCalendarHeatmap(games, currentYear, statsArea, colorA);
+        renderGamesChart(document.getElementById('player-games-chart'), games, colorA);
+        return;
+      }
+    }
+
+    renderAverages(container.querySelector('.player-averages'), games);
+    renderCalendarHeatmap(games, currentYear, statsArea);
+    renderGamesChart(document.getElementById('player-games-chart'), games);
+  });
 }

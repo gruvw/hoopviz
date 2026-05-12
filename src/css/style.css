@@ -51,9 +51,6 @@ nav {
     --tab-selector-gap: 8px;
 }
 
-#game-type-select {
-    --tab-selector-width: 120px;
-}
 
 nav h1 {
     color: white;
@@ -231,6 +228,34 @@ section#players:not(.selected) {
     user-select: none;
 }
 
+#players .bubble-logo-img {
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.bubble-hover-label {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    background: rgba(0,0,0,0.75);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 5px 1px 5px;
+    border-radius: 6px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.bubble:hover .bubble-hover-label {
+    display: block;
+    transform: translateX(-50%) scale(calc(1 / (var(--size) * 1.3))); /* to keep the text size static */
+    transform-origin: 50% 100%;
+}
+
 .bubble.transition {
   transition:
         translate var(--transition-time) ease-in-out,
@@ -303,7 +328,7 @@ section#players:not(.selected) {
     font-size: 12px;
     text-align: center;
 
-    color: #666;
+    color: #ffffffe4;
     z-index: 100;
     pointer-events: none;
 }

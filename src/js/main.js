@@ -18,7 +18,7 @@ new Screens({
     bubbleLogo: (row) => row["teamSlug"],
     statsUpdate: Stats.updateTeamStats,
     attributes: Stats.TEAM_ATTRIBUTES,
-    build: Stats.makeRadarBuild("#team-radar", { size: 170, margin: 70 }),
+    build: Stats.makeRadarBuild("#team-radar", { size: 210 }),
   }),
   // players BubbleMap
   rightBubbleMap: new BubbleMap({
@@ -27,8 +27,9 @@ new Screens({
     metadataLoader: new MetadataLoader("./data/players_metadata.csv", (row) => row["personId"]),
     bubbleContent: (row) => row["firstName"] + " " + row["lastName"],
     bubbleColor: (row) => "#005ce6",
+    bubbleLogoUrl: (row) => `https://cdn.nba.com/headshots/nba/latest/1040x760/${row["personId"]}.png`,
     statsUpdate: Stats.updatePlayerStats,
     attributes: Stats.PLAYER_ATTRIBUTES,
-    build: Stats.makeRadarBuild("#player-radar", { size: 240, margin: 90 }),
+    build: Stats.makeRadarBuild("#player-radar", { size: 200 }),
   }),
 })

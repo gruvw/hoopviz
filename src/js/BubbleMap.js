@@ -21,6 +21,7 @@ export class BubbleMap {
     this.bubbleContent = options.bubbleContent;
     this.bubbleColor = options.bubbleColor;
     this.bubbleLogo = options.bubbleLogo;
+    this.bubbleLogoUrl = options.bubbleLogoUrl;
 
     // DOM elements
     this.viewport = this.container.querySelector(".viewport");
@@ -28,7 +29,7 @@ export class BubbleMap {
     this.measureBubble = this.container.querySelector(".measure-bubble");
     this.stats = this.container.querySelector(".stats");
     this.statsArea = this.stats.querySelector(".stats-area");
-    this.statsClose = this.statsArea.querySelector(".stats-close");
+    this.statsClose = document.querySelector(".stats-close-layer .stats-close");
     this.overlay = this.container.querySelector(".overlay");
 
     this.axisX = this.container.querySelector(".axis.x");
@@ -227,7 +228,7 @@ export class BubbleMap {
     const positions = {}
     data.forEach((values, itemId) => {
       const meta = metaById.get(itemId) || {};
-      const isLogo = !!meta.bubbleLogo || (meta.bubbleColor && meta.bubbleColor.includes("url"));
+      const isLogo = !!meta.bubbleLogo || !!meta.bubbleLogoUrl || (meta.bubbleColor && meta.bubbleColor.includes("url"));
       const baseSize = values[2] * 0.7 + 0.2;
       const scaledSize = isLogo ? baseSize * this.LOGO_BUBBLE_SCALE : baseSize;
 
@@ -269,7 +270,8 @@ export class BubbleMap {
     const bubbleContent = this.getMetaValue(itemId, this.bubbleContent);
     const bubbleColor = this.getMetaValue(itemId, this.bubbleColor);
     const bubbleLogo = this.getMetaValue(itemId, this.bubbleLogo);
-    return { bubbleContent, bubbleColor, bubbleLogo };
+    const bubbleLogoUrl = this.getMetaValue(itemId, this.bubbleLogoUrl);
+    return { bubbleContent, bubbleColor, bubbleLogo, bubbleLogoUrl };
   }
 
   getLogoUrl(itemId, bubbleLogo) {
@@ -282,22 +284,29 @@ export class BubbleMap {
   }
 
   updateBubbleContent(bubble, itemId, meta = null) {
-    const { bubbleContent, bubbleColor, bubbleLogo } = meta || this.getBubbleMeta(itemId);
+    const { bubbleContent, bubbleColor, bubbleLogo, bubbleLogoUrl } = meta || this.getBubbleMeta(itemId);
 
     bubble.classList.remove("bubble-logo");
     bubble.style.background = "";
     bubble.textContent = "";
-    bubble.querySelectorAll(".bubble-logo-img").forEach((img) => img.remove());
+    bubble.querySelectorAll(".bubble-logo-img, .bubble-hover-label").forEach((el) => el.remove());
 
-    if (bubbleLogo) {
+    const logoSrc = bubbleLogoUrl || (bubbleLogo ? this.getLogoUrl(itemId, bubbleLogo) : null);
+    if (logoSrc) {
       bubble.classList.add("bubble-logo");
       const logo = document.createElement("img");
       logo.className = "bubble-logo-img";
-      logo.src = this.getLogoUrl(itemId, bubbleLogo);
+      logo.src = logoSrc;
       logo.alt = bubbleContent || "";
       logo.decoding = "async";
       logo.loading = "lazy";
       bubble.appendChild(logo);
+      if (bubbleContent) {
+        const label = document.createElement("span");
+        label.className = "bubble-hover-label";
+        label.textContent = bubbleContent;
+        bubble.appendChild(label);
+      }
       return;
     }
 
@@ -347,7 +356,11 @@ export class BubbleMap {
         e.preventDefault();
 
         this.statsItem = item;
+        this.statsUpdate(this.stats, this.seasonsLoader, this.metadataLoader, this.currentYear, item);
+        this.statsArea.style.background = bubble.style.background;
+
         this.stats.classList.add("active");
+        if (this.statsClose) this.statsClose.style.display = "block";
         this.statsUpdate();
       });
 
@@ -411,6 +424,9 @@ export class BubbleMap {
   closeStats() {
     this.stats.classList.remove("active");
     this.statsItem = null;
+    if (this.statsClose && !document.querySelector("#screens .stats.active")) {
+      this.statsClose.style.display = "none";
+    }
   }
 
   bindMapEvents() {

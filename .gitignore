@@ -26,3 +26,5 @@ data/**/*
 !data/*.md
 !data/processed/*.md
 !data/**/.gitkeep
+
+src/data/games_by_player/*
