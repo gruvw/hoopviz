@@ -1139,6 +1139,32 @@ function fmtDate(str) {
   return isNaN(d) ? str.slice(0, 10) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function getShotFilters(container) {
+  const madeSelect = container.querySelector('#shot-filter-made');
+  const valueSelect = container.querySelector('#shot-filter-value');
+  return {
+    made: madeSelect ? madeSelect.value : 'all',
+    shotValue: valueSelect ? valueSelect.value : 'all',
+  };
+}
+
+function applyShotFilters(shots, filters) {
+  return shots.filter((d) => {
+    if (filters.made === 'made' && +d.shotMade !== 1) return false;
+    if (filters.made === 'missed' && +d.shotMade !== 0) return false;
+    if (filters.shotValue !== 'all' && +d.shotValue !== +filters.shotValue) return false;
+    return true;
+  });
+}
+
+function wireShotFilterControls(container, onChange) {
+  const madeSelect = container.querySelector('#shot-filter-made');
+  const valueSelect = container.querySelector('#shot-filter-value');
+  if (!madeSelect || !valueSelect) return;
+  madeSelect.onchange = onChange;
+  valueSelect.onchange = onChange;
+}
+
 function renderAverages(el, games) {
   el.innerHTML = '';
   if (!games.length) return;
@@ -1411,10 +1437,22 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
     .text("Loading...");
 
   const reqId = ++playerStatsReqId;
+  let allShots = [];
+
+  const rerenderShotChart = () => {
+    if (reqId !== playerStatsReqId) return;
+    const filters = getShotFilters(container);
+    drawShotChart(chartEl, applyShotFilters(allShots, filters));
+  };
+
+  wireShotFilterControls(container, rerenderShotChart);
 
   loadShots(playerId, currentYear, gameType).then(shots => {
     if (reqId !== playerStatsReqId) return;
-    if (shots !== null) drawShotChart(chartEl, shots);
+    if (shots !== null) {
+      allShots = shots;
+      rerenderShotChart();
+    }
   }).catch(() => {
     if (reqId !== playerStatsReqId) return;
     d3.select(chartEl).selectAll('*').remove();

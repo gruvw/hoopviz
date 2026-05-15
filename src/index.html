@@ -207,6 +207,24 @@
               </div>
             </div>
             <div class="player-shot-chart-card">
+              <div class="shot-chart-filters">
+                <label>
+                  Result
+                  <select id="shot-filter-made">
+                    <option value="all">All</option>
+                    <option value="made">Made</option>
+                    <option value="missed">Missed</option>
+                  </select>
+                </label>
+                <label>
+                  Shot Value
+                  <select id="shot-filter-value">
+                    <option value="all">All</option>
+                    <option value="2">2PT</option>
+                    <option value="3">3PT</option>
+                  </select>
+                </label>
+              </div>
               <svg id="player-chart"></svg>
               <p class="shot-chart-attribution">Court diagram: <a href="https://www.snater.com" target="_blank" rel="noopener">snater.com</a> (CC BY-SA 4.0) via Wikimedia Commons. Modified.</p>
             </div>
