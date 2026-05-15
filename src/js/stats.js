@@ -46,6 +46,8 @@ const RADAR_AXES = 6;
 const EVOLUTION_COLOR_A = "#2e7d32";
 const EVOLUTION_COLOR_B = "#1e40af";
 const EVOLUTION_TOOLTIP_PADDING = 12;
+const GAME_WIN_COLOR = "rgba(79, 174, 132, 0.82)";
+const GAME_LOSS_COLOR = "rgba(200, 107, 99, 0.44)";
 
 // stores the in-flight promise, not the resolved data, concurrent callers get the same promise instead of firing duplicate fetches
 const csvCache = new Map();
@@ -1137,23 +1139,49 @@ function fmtDate(str) {
   return isNaN(d) ? str.slice(0, 10) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function getShotFilters(container) {
+  const madeSelect = container.querySelector('#shot-filter-made');
+  const valueSelect = container.querySelector('#shot-filter-value');
+  return {
+    made: madeSelect ? madeSelect.value : 'all',
+    shotValue: valueSelect ? valueSelect.value : 'all',
+  };
+}
+
+function applyShotFilters(shots, filters) {
+  return shots.filter((d) => {
+    if (filters.made === 'made' && +d.shotMade !== 1) return false;
+    if (filters.made === 'missed' && +d.shotMade !== 0) return false;
+    if (filters.shotValue !== 'all' && +d.shotValue !== +filters.shotValue) return false;
+    return true;
+  });
+}
+
+function wireShotFilterControls(container, onChange) {
+  const madeSelect = container.querySelector('#shot-filter-made');
+  const valueSelect = container.querySelector('#shot-filter-value');
+  if (!madeSelect || !valueSelect) return;
+  madeSelect.onchange = onChange;
+  valueSelect.onchange = onChange;
+}
+
 function renderAverages(el, games) {
   el.innerHTML = '';
   if (!games.length) return;
   const wins = games.filter(r => +r.win === 1).length;
   const defs = [
-    ['Games played', games.length, null],
-    ['Record', `${wins}–${games.length - wins}`, null],
-    ['Points per game', colAvg(games, 'points'), 1],
-    ['Rebounds per game', colAvg(games, 'reboundsTotal'), 1],
-    ['Assists per game', colAvg(games, 'assists'), 1],
-    ['Steals per game', colAvg(games, 'steals'), 1],
-    ['Blocks per game', colAvg(games, 'blocks'), 1],
-    ['Field goal %', colAvg(games, 'fieldGoalsPercentage') * 100, 1],
-    ['Three point %', colAvg(games, 'threePointersPercentage') * 100, 1],
-    ['Plus / minus', fmtPM(colAvg(games, 'plusMinusPoints')), null],
+    ['Games played', `${games.length} games`],
+    ['Record', `${wins}W - ${games.length - wins}L`],
+    ['Points per game', `${fmt(colAvg(games, 'points'), 1)} pts`],
+    ['Rebounds per game', `${fmt(colAvg(games, 'reboundsTotal'), 1)} reb`],
+    ['Assists per game', `${fmt(colAvg(games, 'assists'), 1)} ast`],
+    ['Steals per game', `${fmt(colAvg(games, 'steals'), 1)} stl`],
+    ['Blocks per game', `${fmt(colAvg(games, 'blocks'), 1)} blk`],
+    ['Field goal %', `${fmt(colAvg(games, 'fieldGoalsPercentage') * 100, 1)}%`],
+    ['Three point %', `${fmt(colAvg(games, 'threePointersPercentage') * 100, 1)}%`],
+    ['Plus / minus', `${fmtPM(colAvg(games, 'plusMinusPoints'))}`],
   ];
-  defs.forEach(([label, val, dec]) => {
+  defs.forEach(([label, valueText]) => {
     const item = document.createElement('div');
     item.className = 'summary-item';
     const lbl = document.createElement('span');
@@ -1161,7 +1189,7 @@ function renderAverages(el, games) {
     lbl.textContent = label;
     const num = document.createElement('span');
     num.className = 'summary-value';
-    num.textContent = dec !== null ? fmt(val, dec) : val;
+    num.textContent = valueText;
     item.append(lbl, num);
     el.append(item);
   });
@@ -1208,7 +1236,7 @@ function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285
         event.target.style.strokeWidth = '';
       }
       d3.select('#player-games-chart').selectAll('rect')
-        .attr('fill', d => d && +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
+        .attr('fill', d => d && +d.win === 1 ? GAME_WIN_COLOR : GAME_LOSS_COLOR);
       const popup = statsAreaEl.querySelector('.game-popup');
       if (popup) popup.style.display = 'none';
     });
@@ -1321,7 +1349,7 @@ function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
     .attr('y', d => y(+d.points))
     .attr('width', x.bandwidth())
     .attr('height', d => iH - y(+d.points))
-    .attr('fill', d => +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)')
+    .attr('fill', d => +d.win === 1 ? GAME_WIN_COLOR : GAME_LOSS_COLOR)
     .on('mouseover', function(event, d) {
       d3.select(this).attr('fill', teamColor);
       const dateStr = d?.gameDateTimeEst?.slice(0, 10);
@@ -1340,7 +1368,7 @@ function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
       }
     })
     .on('mouseout', function(event, d) {
-      d3.select(this).attr('fill', +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
+      d3.select(this).attr('fill', +d.win === 1 ? GAME_WIN_COLOR : GAME_LOSS_COLOR);
       document.querySelectorAll('#player-calendar [data-date]').forEach(el => {
         el.style.stroke = '';
         el.style.strokeWidth = '';
@@ -1409,10 +1437,22 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
     .text("Loading...");
 
   const reqId = ++playerStatsReqId;
+  let allShots = [];
+
+  const rerenderShotChart = () => {
+    if (reqId !== playerStatsReqId) return;
+    const filters = getShotFilters(container);
+    drawShotChart(chartEl, applyShotFilters(allShots, filters));
+  };
+
+  wireShotFilterControls(container, rerenderShotChart);
 
   loadShots(playerId, currentYear, gameType).then(shots => {
     if (reqId !== playerStatsReqId) return;
-    if (shots !== null) drawShotChart(chartEl, shots);
+    if (shots !== null) {
+      allShots = shots;
+      rerenderShotChart();
+    }
   }).catch(() => {
     if (reqId !== playerStatsReqId) return;
     d3.select(chartEl).selectAll('*').remove();
