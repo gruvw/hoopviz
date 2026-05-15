@@ -929,11 +929,14 @@
 }
 
 .avg-num {
+  display: inline-block;
   font-size: 17px;
   font-weight: 700;
   line-height: 1.1;
   color: #111;
   font-variant-numeric: tabular-nums;
+  transform: scale(0.9);
+  transform-origin: center;
 }
 
 .avg-label {

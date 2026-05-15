@@ -1144,18 +1144,18 @@ function renderAverages(el, games) {
   if (!games.length) return;
   const wins = games.filter(r => +r.win === 1).length;
   const defs = [
-    ['Games played', games.length, null],
-    ['Record', `${wins}–${games.length - wins}`, null],
-    ['Points per game', colAvg(games, 'points'), 1],
-    ['Rebounds per game', colAvg(games, 'reboundsTotal'), 1],
-    ['Assists per game', colAvg(games, 'assists'), 1],
-    ['Steals per game', colAvg(games, 'steals'), 1],
-    ['Blocks per game', colAvg(games, 'blocks'), 1],
-    ['Field goal %', colAvg(games, 'fieldGoalsPercentage') * 100, 1],
-    ['Three point %', colAvg(games, 'threePointersPercentage') * 100, 1],
-    ['Plus / minus', fmtPM(colAvg(games, 'plusMinusPoints')), null],
+    ['Games played', `${games.length} games`],
+    ['Record', `${wins}W - ${games.length - wins}L`],
+    ['Points per game', `${fmt(colAvg(games, 'points'), 1)} pts`],
+    ['Rebounds per game', `${fmt(colAvg(games, 'reboundsTotal'), 1)} reb`],
+    ['Assists per game', `${fmt(colAvg(games, 'assists'), 1)} ast`],
+    ['Steals per game', `${fmt(colAvg(games, 'steals'), 1)} stl`],
+    ['Blocks per game', `${fmt(colAvg(games, 'blocks'), 1)} blk`],
+    ['Field goal %', `${fmt(colAvg(games, 'fieldGoalsPercentage') * 100, 1)}%`],
+    ['Three point %', `${fmt(colAvg(games, 'threePointersPercentage') * 100, 1)}%`],
+    ['Plus / minus', `${fmtPM(colAvg(games, 'plusMinusPoints'))}`],
   ];
-  defs.forEach(([label, val, dec]) => {
+  defs.forEach(([label, valueText]) => {
     const item = document.createElement('div');
     item.className = 'summary-item';
     const lbl = document.createElement('span');
@@ -1163,7 +1163,7 @@ function renderAverages(el, games) {
     lbl.textContent = label;
     const num = document.createElement('span');
     num.className = 'summary-value';
-    num.textContent = dec !== null ? fmt(val, dec) : val;
+    num.textContent = valueText;
     item.append(lbl, num);
     el.append(item);
   });
