@@ -46,6 +46,8 @@ const RADAR_AXES = 6;
 const EVOLUTION_COLOR_A = "#2e7d32";
 const EVOLUTION_COLOR_B = "#1e40af";
 const EVOLUTION_TOOLTIP_PADDING = 12;
+const GAME_WIN_COLOR = "rgba(79, 174, 132, 0.82)";
+const GAME_LOSS_COLOR = "rgba(200, 107, 99, 0.44)";
 
 // stores the in-flight promise, not the resolved data, concurrent callers get the same promise instead of firing duplicate fetches
 const csvCache = new Map();
@@ -1208,7 +1210,7 @@ function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285
         event.target.style.strokeWidth = '';
       }
       d3.select('#player-games-chart').selectAll('rect')
-        .attr('fill', d => d && +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
+        .attr('fill', d => d && +d.win === 1 ? GAME_WIN_COLOR : GAME_LOSS_COLOR);
       const popup = statsAreaEl.querySelector('.game-popup');
       if (popup) popup.style.display = 'none';
     });
@@ -1321,7 +1323,7 @@ function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
     .attr('y', d => y(+d.points))
     .attr('width', x.bandwidth())
     .attr('height', d => iH - y(+d.points))
-    .attr('fill', d => +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)')
+    .attr('fill', d => +d.win === 1 ? GAME_WIN_COLOR : GAME_LOSS_COLOR)
     .on('mouseover', function(event, d) {
       d3.select(this).attr('fill', teamColor);
       const dateStr = d?.gameDateTimeEst?.slice(0, 10);
@@ -1340,7 +1342,7 @@ function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
       }
     })
     .on('mouseout', function(event, d) {
-      d3.select(this).attr('fill', +d.win === 1 ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.15)');
+      d3.select(this).attr('fill', +d.win === 1 ? GAME_WIN_COLOR : GAME_LOSS_COLOR);
       document.querySelectorAll('#player-calendar [data-date]').forEach(el => {
         el.style.stroke = '';
         el.style.strokeWidth = '';

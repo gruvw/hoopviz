@@ -35,21 +35,25 @@ export function drawShotChart(svgEl, shots) {
     .join("circle")
     .attr("cx", d => toSvgX(+d.locX))
     .attr("cy", d => toSvgY(+d.locY))
-    .attr("r", 5)
+    .attr("r", 7)
     .attr("fill", "none")
-    .attr("stroke", "#31e77d")
+    .attr("stroke", "#46a47a")
     .attr("stroke-width", 1.5)
     .attr("opacity", 0.7);
 
-  const cross = d3.symbol().type(d3.symbolCross).size(50);
-
-  svg.selectAll("path")
+  svg.selectAll(".cross")
     .data(missed)
-    .join("path")
-    .attr("d", cross)
-    .attr("transform", d => `translate(${toSvgX(+d.locX)},${toSvgY(+d.locY)}) rotate(45)`)
-    .attr("fill", "#ee5847")
-    .attr("opacity", 0.7);
+    .join("text")
+    .attr("class", "cross")
+    .attr("x", d => toSvgX(+d.locX))
+    .attr("y", d => toSvgY(+d.locY))
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "central")
+    .attr("font-size", 20)
+    .attr("font-weight", 300)
+    .attr("fill", "#c7645c")
+    .attr("opacity", 0.7)
+    .text("✕");
 }
 
 function getShotFile(season) {

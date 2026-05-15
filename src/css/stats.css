@@ -877,6 +877,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 10px;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 14px;
@@ -884,7 +885,7 @@
 }
 
 .player-stats-col {
-  flex: 1.7;
+  flex: 1.9;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1046,8 +1047,8 @@
 }
 
 .popup-wl { font-size: 13px; font-weight: 700; }
-.popup-win  { color: #31e77d; }
-.popup-loss { color: #ee5847; }
+.popup-win  { color: #4fae84; }
+.popup-loss { color: #c86b63; }
 .popup-opp  { font-size: 13px; font-weight: 500; color: #111; }
 .popup-score { margin-left: auto; font-size: 11px; color: rgba(0,0,0,0.45); }
 .popup-date  { margin-bottom: 10px; font-size: 10px; color: rgba(0,0,0,0.4); }

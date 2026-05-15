@@ -30,6 +30,6 @@ new Screens({
     bubbleLogoUrl: (row) => `https://cdn.nba.com/headshots/nba/latest/1040x760/${row["personId"]}.png`,
     statsUpdate: Stats.updatePlayerStats,
     attributes: Stats.PLAYER_ATTRIBUTES,
-    build: Stats.makeRadarBuild("#player-radar", { size: 200 }),
+    build: Stats.makeRadarBuild("#player-radar", { size: 165 }),
   }),
 })
