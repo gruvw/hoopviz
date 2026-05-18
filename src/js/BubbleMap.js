@@ -422,6 +422,14 @@ export class BubbleMap {
   }
 
   closeStats() {
+    if (this.built?.playerAuxTimer) {
+      clearTimeout(this.built.playerAuxTimer);
+      this.built.playerAuxTimer = null;
+    }
+    if (this.built) {
+      this.built.playerAuxSignature = null;
+      this.built.playerAuxYear = null;
+    }
     this.stats.classList.remove("active");
     this.statsItem = null;
     if (this.statsClose && !document.querySelector("#screens .stats.active")) {

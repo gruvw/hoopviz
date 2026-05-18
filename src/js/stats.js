@@ -108,6 +108,51 @@ function averageArrays(arrays) {
   return sums.map((sum, index) => counts[index] ? sum / counts[index] : 0);
 }
 
+function buildRadarSeries(attributes, normalizedValues, rawValues) {
+  return attributes.map((attr, i) => {
+    const value = normalizedValues?.[i];
+    const rawValue = rawValues?.[i];
+    return {
+      axis: i,
+      value: Number.isFinite(value) ? value : 0,
+      rawValue: Number.isFinite(rawValue) ? rawValue : null,
+      axisName: attr[0],
+    };
+  });
+}
+
+function normalizeRadarValuesByAxis(data, axisCount) {
+  if (!data || data.size === 0) return new Map();
+  const minValues = new Array(axisCount).fill(Infinity);
+  const maxValues = new Array(axisCount).fill(-Infinity);
+
+  for (const values of data.values()) {
+    for (let i = 0; i < axisCount; i++) {
+      const value = Number(values?.[i]);
+      if (!Number.isFinite(value)) continue;
+      if (value < minValues[i]) minValues[i] = value;
+      if (value > maxValues[i]) maxValues[i] = value;
+    }
+  }
+
+  const normalized = new Map();
+  for (const [key, values] of data.entries()) {
+    const row = new Array(axisCount);
+    for (let i = 0; i < axisCount; i++) {
+      const value = Number(values?.[i]);
+      if (!Number.isFinite(value) || !Number.isFinite(minValues[i]) || !Number.isFinite(maxValues[i])) {
+        row[i] = NaN;
+        continue;
+      }
+      const range = maxValues[i] - minValues[i];
+      row[i] = range === 0 ? 0 : (value - minValues[i]) / range;
+    }
+    normalized.set(key, row);
+  }
+
+  return normalized;
+}
+
 function getRankMap(rows, year, gameType) {
   const teams = rows
     .filter((row) => row.season === String(year) && row.gameType === gameType)
@@ -1086,8 +1131,8 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
 
   // radar chart
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
-  let rawData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
-  let data = Data.applyData(rawData, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
+  let rawData = seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1]));
+  let data = normalizeRadarValuesByAxis(rawData, radarFullAttributes.length);
   const teamRawData = rawData.get(teamId) || [];
   const teamRadarData = data.get(teamId) || [];
   const allTeamData = Array.from(data.values());
@@ -1095,8 +1140,8 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   const averageRawData = averageArrays(Array.from(rawData.values()));
 
   const dataPoints = [
-    radarFullAttributes.map((attr, i) => ({ axis: i, value: teamRadarData[i], rawValue: teamRawData[i], axisName: attr[0] })),
-    radarFullAttributes.map((attr, i) => ({ axis: i, value: averageRadarData[i], rawValue: averageRawData[i], axisName: attr[0] })),
+    buildRadarSeries(radarFullAttributes, teamRadarData, teamRawData),
+    buildRadarSeries(radarFullAttributes, averageRadarData, averageRawData),
   ];
 
   built.gameType = gameType;
@@ -1413,16 +1458,16 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
 
   // radar chart
   let radarFullAttributes = Utils.makeList(built.bubbleMapAttributes, built.radarAttributes);
-  let rawData = Data.filter_error_values(seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1])));
-  let data = Data.applyData(rawData, radarFullAttributes.map((_) => Data.min_max_norm_shaper), null);
+  let rawData = seasonsLoader.getData(currentYear, ...radarFullAttributes.map((a) => a[1]));
+  let data = normalizeRadarValuesByAxis(rawData, radarFullAttributes.length);
   const playerRawData = rawData.get(playerId) || [];
   let playerRadarData = data.get(playerId) || [];
   const allPlayerData = Array.from(data.values());
   const averageRadarData = averageArrays(allPlayerData);
   const averageRawData = averageArrays(Array.from(rawData.values()));
   let dataPoints = [
-    radarFullAttributes.map((attr, i) => ({ axis: i, value: playerRadarData[i], rawValue: playerRawData[i], axisName: attr[0] })),
-    radarFullAttributes.map((attr, i) => ({ axis: i, value: averageRadarData[i], rawValue: averageRawData[i], axisName: attr[0] })),
+    buildRadarSeries(radarFullAttributes, playerRadarData, playerRawData),
+    buildRadarSeries(radarFullAttributes, averageRadarData, averageRawData),
   ];
   const colorKey = `${playerId}|${currentYear}|${gameType}`;
   if (!built.playerRadarColorsByKey) built.playerRadarColorsByKey = new Map();
