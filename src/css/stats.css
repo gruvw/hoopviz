@@ -870,14 +870,22 @@
   overflow: hidden;
 }
 
-.player-team-logo {
+.player-team-logos {
   position: absolute;
   bottom: 8px;
   right: 8px;
-  width: 36px;
-  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.player-team-logo-item {
+  width: 48px;
+  height: 48px;
   object-fit: contain;
-  opacity: 0.85;
+  opacity: 0.92;
+  padding: 2px;
 }
 
 .player-headshot {
