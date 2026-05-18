@@ -37,6 +37,34 @@ function getMetaValue(metadataLoader, id, getter, year) {
   return metadataLoader.getValueForSeason(id, getter, year);
 }
 
+function mapHasEntity(data, entityId) {
+  const target = String(entityId);
+  for (const key of data.keys()) {
+    if (String(key) === target) return true;
+  }
+  return false;
+}
+
+function clearDataUnavailableMessage(container) {
+  const statsArea = container.querySelector(".stats-area");
+  if (!statsArea) return;
+  statsArea.classList.remove("has-data-unavailable-message");
+  statsArea.querySelector(".data-unavailable-message")?.remove();
+}
+
+function showDataUnavailableMessage(container, message) {
+  const statsArea = container.querySelector(".stats-area");
+  if (!statsArea) return;
+  statsArea.classList.add("has-data-unavailable-message");
+  let messageEl = statsArea.querySelector(".data-unavailable-message");
+  if (!messageEl) {
+    messageEl = document.createElement("div");
+    messageEl.className = "data-unavailable-message";
+    statsArea.appendChild(messageEl);
+  }
+  messageEl.textContent = message;
+}
+
 function formatValue(value) {
   return Number.isFinite(value) ? value.toFixed(2) : "N/A";
 }
@@ -1051,6 +1079,29 @@ export function makeRadarBuild(radarId, options = {}) {
 }
 
 export function updateTeamStats(container, built, seasonsLoader, metadataLoader, currentYear, teamId, gameType = "Regular Season") {
+  clearDataUnavailableMessage(container);
+  const seasonData = seasonsLoader.getData(currentYear, (row) => row["teamId"]);
+  const hasTeamDataThisYear = mapHasEntity(seasonData, teamId);
+  const hasTeamIdentityThisYear = metadataLoader.getRowForSeason(teamId, currentYear) !== null;
+  const hasTeamIdentityAnyYear = metadataLoader.getValue(teamId, () => true) !== null;
+
+  if (!hasTeamDataThisYear) {
+    cleanupPlayoffTooltips();
+    if (built?.evolution?.tooltipEl) built.evolution.tooltipEl.style.opacity = "0";
+
+    let message = `No data available for this team in ${currentYear}.`;
+    if (gameType === "Playoffs") {
+      message = hasTeamIdentityThisYear
+        ? `No playoff participation for this team in ${currentYear}.`
+        : `This team did not exist in ${currentYear}.`;
+    } else if (!hasTeamIdentityThisYear && hasTeamIdentityAnyYear) {
+      message = `This team did not exist in ${currentYear}.`;
+    }
+
+    showDataUnavailableMessage(container, message);
+    return;
+  }
+
   const logo = container.querySelector(".stats-logo");
 
   const teamAbbrev = getMetaValue(metadataLoader, teamId, (row) => row["teamAbbrev"], currentYear);
@@ -1445,9 +1496,35 @@ function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
 export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId, gameType = "Regular Season") {
   const PLAYER_RADAR_DEFAULT_COLOR = "#005ce6";
   const PLAYER_RADAR_DEFAULT_AVG_COLOR = "rgba(80,80,80,0.7)";
+
+  clearDataUnavailableMessage(container);
+  const seasonData = seasonsLoader.getData(currentYear, (row) => row["personId"]);
+  const hasPlayerDataThisYear = mapHasEntity(seasonData, playerId);
+  const hasPlayerIdentity = metadataLoader.getValue(playerId, () => true) !== null;
+  if (!hasPlayerDataThisYear) {
+    if (built.playerAuxTimer) {
+      clearTimeout(built.playerAuxTimer);
+      built.playerAuxTimer = null;
+    }
+    playerStatsReqId += 1;
+    const teamLogoEl = container.querySelector(".player-team-logo");
+    if (teamLogoEl) {
+      teamLogoEl.hidden = true;
+      teamLogoEl.removeAttribute("src");
+    }
+
+    const message = gameType === "Playoffs"
+      ? `No playoff participation for this player in ${currentYear}.`
+      : hasPlayerIdentity
+        ? `This player has no data for ${currentYear}.`
+        : "Player data unavailable.";
+    showDataUnavailableMessage(container, message);
+    return;
+  }
+
   const name = container.querySelector(".name");
   const playerName = getMetaValue(metadataLoader, playerId, (row) => row["firstName"] + " " + row["lastName"], currentYear);
-  name.innerText = playerName;
+  name.innerText = playerName || "";
 
   const headshot = container.querySelector(".player-headshot");
   if (headshot) {
