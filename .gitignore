@@ -27,4 +27,4 @@ data/**/*
 !data/processed/*.md
 !data/**/.gitkeep
 
-src/data/games_by_player/*
+node_modules/
