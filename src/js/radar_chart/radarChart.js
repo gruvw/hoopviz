@@ -273,9 +273,9 @@ export function RadarChart(id, data, options) {
       });
 
     radarAreas.merge(radarAreasEnter)
-      .style("fill", function(d, i) { return color(i); })
       .attr("class", function(d, i) { return "radarArea series-" + i; })
       .transition("update").duration(duration)
+      .style("fill", function(d, i) { return color(i); })
       .style("opacity", 1)
       .attr("d", function(d, i) { return radarLine(d); });
 
@@ -294,9 +294,9 @@ export function RadarChart(id, data, options) {
       .style("fill", "none");
 
     radarStrokes.merge(radarStrokesEnter)
-      .style("stroke", function(d, i) { return color(i); })
       .attr("class", function(d, i) { return "radarStroke series-" + i; })
       .transition("update").duration(duration)
+      .style("stroke", function(d, i) { return color(i); })
       .style("opacity", 1)
       .attr("d", function(d, i) { return radarLine(d); });
 
@@ -334,9 +334,9 @@ export function RadarChart(id, data, options) {
       .style("fill-opacity", 0.8);
 
     radarCircles.merge(radarCirclesEnter)
-      .style("fill", function(d) { return color(d.parentIndex); })
       .attr("class", function(d) { return "radarCircle series-" + d.parentIndex; })
       .transition("update").duration(duration)
+      .style("fill", function(d) { return color(d.parentIndex); })
       .attr("cx", function(d, i) { return rScale(d.value) * Math.cos(angleSlice * i - Math.PI / 2); })
       .attr("cy", function(d, i) { return rScale(d.value) * Math.sin(angleSlice * i - Math.PI / 2); });
 

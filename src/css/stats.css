@@ -884,6 +884,15 @@
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 14px;
   overflow: hidden;
+  position: relative;
+}
+
+.player-radar-legend {
+  top: 8px;
+  left: 8px;
+  font-size: 10px;
+  padding: 3px 7px;
+  gap: 8px;
 }
 
 .player-stats-col {
@@ -956,6 +965,19 @@
 
 #players .player-radar-card .axisLabel {
   fill: rgba(255, 255, 255, 0.88) !important;
+}
+
+#teams .radar-card .gridCircle {
+  fill: rgba(255, 255, 255, 0.14) !important;
+  stroke: rgba(255, 255, 255, 0.88) !important;
+}
+
+#teams .radar-card .axisLabel {
+  fill: rgba(255, 255, 255, 0.88) !important;
+}
+
+#teams .radar-card .axis .line {
+  stroke: rgba(255, 255, 255, 0.88) !important;
 }
 
 #player-calendar {
