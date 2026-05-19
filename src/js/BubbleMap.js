@@ -15,9 +15,10 @@ export class BubbleMap {
     this.container = document.querySelector(options.containerSelector);
     this.seasonsLoader = options.seasonsLoader;
     this.containerIdPrefix = `${this.container.id}-`;
-    this.statsUpdate = () => options.statsUpdate(this.stats, this.built, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem, this.gameType);
+    this.statsUpdate = () => options.statsUpdate(this.stats, this.built, this.seasonsLoader, this.metadataLoader, this.currentYear, this.statsItem, this.gameType, options.awardsLoader);
 
     this.metadataLoader = options.metadataLoader;
+    this.awardsLoader = options.awardsLoader;
     this.bubbleContent = options.bubbleContent;
     this.bubbleColor = options.bubbleColor;
     this.bubbleLogo = options.bubbleLogo;

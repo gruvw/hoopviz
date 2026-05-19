@@ -5,11 +5,14 @@ const toSvgY = locY => 89.8 + locY * 0.761;
 
 let _shotRequestId = 0;
 
+// Court occupies x: 0–435, y: 36–444 in SVG space. Crop to remove dead space.
+const COURT_VIEWBOX = "0 20 440 424";
+
 export function drawShotChart(svgEl, shots) {
   const svg = d3.select(svgEl);
   svg.selectAll("*").remove();
 
-  svg.attr("viewBox", "0 0 601 444")
+  svg.attr("viewBox", COURT_VIEWBOX)
      .attr("preserveAspectRatio", "xMidYMid meet");
 
   svg.append("image")

@@ -2,7 +2,11 @@ import { BubbleMap } from "./BubbleMap.js";
 import { Screens } from "./Screens.js";
 import { SeasonsLoader } from "./SeasonsLoader.js";
 import { MetadataLoader } from "./MetadataLoader.js";
+import { AwardsLoader } from "./AwardsLoader.js";
 import * as Stats from "./stats.js";
+
+const awardsLoader = new AwardsLoader();
+await awardsLoader.load();
 
 new Screens({
   containerSelector: "#screens",
@@ -30,6 +34,7 @@ new Screens({
     bubbleLogoUrl: (row) => `https://cdn.nba.com/headshots/nba/latest/1040x760/${row["personId"]}.png`,
     statsUpdate: Stats.updatePlayerStats,
     attributes: Stats.PLAYER_ATTRIBUTES,
+    awardsLoader: awardsLoader,
     build: Stats.makeRadarBuild("#player-radar", { size: 165 }),
   }),
 })

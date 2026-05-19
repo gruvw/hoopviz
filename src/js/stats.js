@@ -265,6 +265,25 @@ function buildTeamLogoUrlFromMeta(metaRow, fallbackYear) {
   return `https://i.logocdn.com/nba/${logoYearSegment}/${metaRow.teamSlug}.svg`;
 }
 
+function renderTopTeamLogos(container, logoUrls) {
+  const bar = container.querySelector(".player-main-team-logos-bar");
+  if (!bar) return;
+  const uniqueUrls = [...new Set((logoUrls || []).filter(Boolean))].slice(0, 2);
+  const newKey = uniqueUrls.join("|");
+  if ((bar.dataset.logoKey || "") === newKey) return;
+  bar.dataset.logoKey = newKey;
+  bar.innerHTML = "";
+  uniqueUrls.forEach((url, i) => {
+    const img = document.createElement("img");
+    img.className = "logo-item";
+    img.src = url;
+    img.alt = `Team logo ${i + 1}`;
+    img.decoding = "async";
+    img.loading = "lazy";
+    bar.appendChild(img);
+  });
+}
+
 function renderPlayerTeamLogos(container, logoUrls) {
   const headshotCard = container.querySelector(".player-headshot-card");
   if (!headshotCard) return;
@@ -1552,7 +1571,34 @@ function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
     .text('PTS per game');
 }
 
-export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId, gameType = "Regular Season") {
+function findNbaChampion(rows, year) {
+  const playoffRows = rows.filter(r => r.season === String(year) && r.gameType === "Playoffs");
+  if (!playoffRows.length) return null;
+  const seriesMap = new Map();
+  playoffRows.forEach(r => {
+    const key = [r.teamId, r.opponentTeamId].sort().join("|");
+    if (!seriesMap.has(key)) seriesMap.set(key, []);
+    seriesMap.get(key).push(r);
+  });
+  let latestTime = -Infinity;
+  let finalsSeries = null;
+  for (const games of seriesMap.values()) {
+    const maxTime = Math.max(...games.map(g => new Date(g.gameDateTimeEst || 0).getTime()));
+    if (maxTime > latestTime) { latestTime = maxTime; finalsSeries = games; }
+  }
+  if (!finalsSeries) return null;
+  const wins = new Map();
+  finalsSeries.forEach(g => {
+    if (Number(g.win) === 1) wins.set(g.teamId, (wins.get(g.teamId) || 0) + 1);
+  });
+  let champion = null, maxWins = 0;
+  for (const [teamId, w] of wins) {
+    if (w > maxWins) { maxWins = w; champion = teamId; }
+  }
+  return champion;
+}
+
+export function updatePlayerStats(container, built, seasonsLoader, metadataLoader, currentYear, playerId, gameType = "Regular Season", awardsLoader = null) {
   const PLAYER_RADAR_DEFAULT_COLOR = "#005ce6";
   const PLAYER_RADAR_DEFAULT_AVG_COLOR = "rgba(80,80,80,0.7)";
 
@@ -1566,7 +1612,7 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
       built.playerAuxTimer = null;
     }
     playerStatsReqId += 1;
-    renderPlayerTeamLogos(container, []);
+    renderTopTeamLogos(container, []);
 
     const message = gameType === "Playoffs"
       ? `No playoff participation for this player in ${currentYear}.`
@@ -1586,6 +1632,27 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
     headshot.src = `https://cdn.nba.com/headshots/nba/latest/1040x760/${playerId}.png`;
     headshot.hidden = false;
     headshot.onerror = () => { headshot.hidden = true; };
+  }
+
+  // Render awards (champion badge added async once team data is known)
+  const awardsContainer = container.querySelector(".player-awards-container");
+  if (awardsContainer && awardsLoader) {
+    const awardKey = `${playerName}|${currentYear + 1}`;
+    if (awardsContainer.dataset.awardKey !== awardKey) {
+      awardsContainer.dataset.awardKey = awardKey;
+      const playerAwards = awardsLoader.getPlayerAwardsByName(playerName, currentYear + 1);
+      awardsContainer.innerHTML = "";
+      playerAwards.forEach((award) => {
+        const awardEl = document.createElement("div");
+        awardEl.className = "player-award";
+        awardEl.title = award.label;
+        const img = document.createElement("img");
+        img.src = `data/nba_awards/${award.icon}`;
+        img.alt = award.label;
+        awardEl.appendChild(img);
+        awardsContainer.appendChild(awardEl);
+      });
+    }
   }
 
   // radar chart
@@ -1617,14 +1684,17 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
   const auxSignature = colorKey;
   if (built.playerAuxSignature === auxSignature) return;
   const previousAuxYear = built.playerAuxYear;
+  const previousAuxPlayer = built.playerAuxPlayer;
   built.playerAuxSignature = auxSignature;
   built.playerAuxYear = String(currentYear);
+  built.playerAuxPlayer = String(playerId);
   const yearChanged = previousAuxYear != null && previousAuxYear !== built.playerAuxYear;
+  const playerChanged = previousAuxPlayer !== built.playerAuxPlayer;
 
   if (built.playerAuxTimer) {
     clearTimeout(built.playerAuxTimer);
   }
-  renderPlayerTeamLogos(container, []);
+  if (playerChanged) renderTopTeamLogos(container, []);
 
   // games, calendar, shot chart
   built.playerAuxTimer = setTimeout(() => {
@@ -1636,10 +1706,10 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
 
       const loadingSvg = d3.select(chartEl);
       loadingSvg.selectAll("*").remove();
-      loadingSvg.attr("viewBox", "0 0 601 444").attr("preserveAspectRatio", "xMidYMid meet");
+      loadingSvg.attr("viewBox", "0 20 440 424").attr("preserveAspectRatio", "xMidYMid meet");
       loadingSvg.append("image").attr("href", "data/nba-court.svg").attr("width", 601).attr("height", 444);
       loadingSvg.append("text")
-        .attr("x", 300).attr("y", 222)
+        .attr("x", 218).attr("y", 230)
         .attr("text-anchor", "middle")
         .attr("fill", "#ffffff").attr("font-size", 16)
         .text("Loading...");
@@ -1651,6 +1721,7 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
       if (reqId !== playerStatsReqId) return;
       const filters = getShotFilters(container);
       drawShotChart(chartEl, applyShotFilters(allShots, filters));
+      d3.select(chartEl).attr("viewBox", "0 20 440 424").attr("preserveAspectRatio", "xMidYMid meet");
     };
 
     wireShotFilterControls(container, rerenderShotChart);
@@ -1665,9 +1736,9 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
       if (reqId !== playerStatsReqId) return;
       d3.select(chartEl).selectAll('*').remove();
       d3.select(chartEl)
-        .attr("viewBox", "0 0 601 444").attr("preserveAspectRatio", "xMidYMid meet")
+        .attr("viewBox", "0 20 440 424").attr("preserveAspectRatio", "xMidYMid meet")
         .append("text")
-          .attr("x", 300).attr("y", 222)
+          .attr("x", 218).attr("y", 230)
           .attr("text-anchor", "middle")
           .attr("fill", "#ffffff").attr("font-size", 16)
           .text("No shot data");
@@ -1677,7 +1748,8 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
       loadPlayerGames(playerId),
       loadCsv('./data/team_seasons.csv'),
       loadCsv('./data/team_metadata.csv'),
-    ]).then(([allGames, teamSeasons, teamMeta]) => {
+      loadCsv('./data/team_games.csv'),
+    ]).then(([allGames, teamSeasons, teamMeta, teamGames]) => {
       if (reqId !== playerStatsReqId) return;
 
       const games = allGames
@@ -1698,9 +1770,28 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
           const [city, name] = teamKey.split('|');
           const teamRow = teamSeasons.find(r => +r.season === +currentYear && r.teamName === name && r.teamCity === city);
           const metaRow = teamRow ? getTeamMetaRowForSeason(teamMeta, teamRow.teamId, currentYear) : null;
-          return { gameCount: stats.gameCount, firstIndex: stats.firstIndex, metaRow };
+          return { gameCount: stats.gameCount, firstIndex: stats.firstIndex, metaRow, teamId: teamRow?.teamId };
         })
         .filter((entry) => entry.metaRow);
+
+      // NBA Champion badge — prepended to awards if player's team won the Finals
+      const championTeamId = findNbaChampion(teamGames, currentYear);
+      const isChampion = !!championTeamId && teamsPlayed.some(t => String(t.teamId) === String(championTeamId));
+      if (isChampion && reqId === playerStatsReqId) {
+        const ac = container.querySelector(".player-awards-container");
+        if (ac) {
+          ac.querySelector('[data-award="champion"]')?.remove();
+          const el = document.createElement("div");
+          el.className = "player-award";
+          el.title = "NBA Champion";
+          el.dataset.award = "champion";
+          const img = document.createElement("img");
+          img.src = "data/nba_awards/nba_champion.svg";
+          img.alt = "NBA Champion";
+          el.appendChild(img);
+          ac.prepend(el);
+        }
+      }
 
       const primaryTeam = [...teamsPlayed]
         .sort((a, b) => b.gameCount - a.gameCount || a.firstIndex - b.firstIndex)[0];
@@ -1712,7 +1803,7 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
           .sort((a, b) => a.firstIndex - b.firstIndex)
           .map(({ metaRow: row }) => buildTeamLogoUrlFromMeta(row, currentYear))
           .filter(Boolean);
-        renderPlayerTeamLogos(container, teamLogoUrls);
+        renderTopTeamLogos(container, teamLogoUrls);
         built.playerRadarColorsByKey.set(colorKey, [colorA, colorB]);
         built.colors = [colorA, colorB];
         statsArea.style.background = colorA;
@@ -1725,7 +1816,7 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
         return;
       }
 
-      renderPlayerTeamLogos(container, []);
+      renderTopTeamLogos(container, []);
       renderAverages(container.querySelector('.player-averages'), games);
       renderCalendarHeatmap(games, currentYear, statsArea);
       renderGamesChart(document.getElementById('player-games-chart'), games);
