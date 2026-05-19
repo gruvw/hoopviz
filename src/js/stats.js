@@ -1172,9 +1172,6 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   const teamName = seasonsLoader.getData(currentYear, (row) => row["teamName"]).get(teamId);
   const displayName = [teamCity, teamName].filter(Boolean).join(" ");
 
-  const logoNameEl = container.querySelector(".logo-team-name");
-  if (logoNameEl) logoNameEl.textContent = displayName || teamAbbrev || "";
-
   if (logo) {
     if (teamSlug) {
       const activeTill = getMetaValue(metadataLoader, teamId, (row) => row["seasonActiveTill"], currentYear);

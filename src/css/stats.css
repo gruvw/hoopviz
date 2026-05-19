@@ -164,25 +164,6 @@
     position: relative;
 }
 
-.logo-team-name {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: clamp(20px, 3.5vw, 38px);
-    font-weight: 900;
-    color: rgba(0, 0, 0, 0.08);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    text-align: center;
-    padding: 12px;
-    line-height: 1.1;
-    word-break: break-word;
-    pointer-events: none;
-    z-index: 0;
-}
-
 .stats-logo {
     position: relative;
     z-index: 1;
