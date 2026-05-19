@@ -2,7 +2,7 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { RadarChart } from "./radar_chart/radarChart.js";
 import * as Utils from "./utils.js";
 import * as Data from "./data.js";
-import { drawShotChart, loadShots } from "./ShotChart.js";
+import { drawShotChart, loadShots, highlightShotsByGame } from "./ShotChart.js";
 
 export const TEAM_ATTRIBUTES = [
   // [display name, row to value function]
@@ -1374,7 +1374,7 @@ function renderAverages(el, games) {
   });
 }
 
-function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285') {
+function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285', onGameHover = null, onGameLeave = null) {
   if (calInstance) {
     try { calInstance.destroy(); } catch (e) {}
     calInstance = null;
@@ -1406,7 +1406,10 @@ function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285
         .filter(d => d?.gameDateTimeEst?.slice(0, 10) === dateStr)
         .attr('fill', color);
       const game = gamesByDate.get(dateStr);
-      if (game) showGamePopup(event, game, statsAreaEl);
+      if (game) {
+        showGamePopup(event, game, statsAreaEl);
+        if (onGameHover) onGameHover(game.gameId);
+      }
     });
 
     calInstance.on('mouseout', (event, timestamp, value) => {
@@ -1418,6 +1421,7 @@ function renderCalendarHeatmap(games, currentYear, statsAreaEl, color = '#0f3285
         .attr('fill', d => d && +d.win === 1 ? GAME_WIN_COLOR : GAME_LOSS_COLOR);
       const popup = statsAreaEl.querySelector('.game-popup');
       if (popup) popup.style.display = 'none';
+      if (onGameLeave) onGameLeave();
     });
 
     calInstance.paint({
@@ -1502,7 +1506,7 @@ function showGamePopup(event, game, statsAreaEl) {
   popup.style.cssText = `display:block; left:${Math.max(8, left)}px; top:${Math.max(8, top)}px; transform:none;`;
 }
 
-function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
+function renderGamesChart(svgEl, games, teamColor = '#005ce6', onGameHover = null, onGameLeave = null) {
   const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
   if (!games.length) return;
@@ -1544,6 +1548,7 @@ function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
         const game = gamesByDate.get(dateStr);
         const statsAreaEl = svgEl.closest('.stats-area');
         if (game && statsAreaEl) showGamePopup(event, game, statsAreaEl);
+        if (onGameHover && d.gameId) onGameHover(d.gameId);
       }
     })
     .on('mouseout', function(event, d) {
@@ -1555,6 +1560,7 @@ function renderGamesChart(svgEl, games, teamColor = '#005ce6') {
       const statsAreaEl = svgEl.closest('.stats-area');
       const popup = statsAreaEl?.querySelector('.game-popup');
       if (popup) popup.style.display = 'none';
+      if (onGameLeave) onGameLeave();
     });
 
   g.append('line')
@@ -1722,10 +1728,42 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
     const reqId = ++playerStatsReqId;
     let allShots = [];
 
+    const gameContext = { gamesById: new Map(), teamColor: '#005ce6' };
+
+    const onGameHover = (gameId, event) => {
+      highlightShotsByGame(chartEl, gameId);
+      d3.select('#player-games-chart').selectAll('rect')
+        .filter(d => String(d?.gameId) === String(gameId))
+        .attr('fill', gameContext.teamColor);
+      const game = gameContext.gamesById.get(String(gameId));
+      if (game) {
+        const dateStr = game.gameDateTimeEst?.slice(0, 10);
+        if (dateStr) {
+          const ts = new Date(dateStr).getTime();
+          const calRect =
+            document.querySelector(`#player-calendar rect[data-date="${dateStr}"]`) ||
+            document.querySelector(`#player-calendar rect[data-date="${ts}"]`);
+          if (calRect) { calRect.style.stroke = gameContext.teamColor; calRect.style.strokeWidth = '2px'; }
+        }
+        if (event) showGamePopup(event, game, statsArea);
+      }
+    };
+
+    const onGameLeave = () => {
+      highlightShotsByGame(chartEl, null);
+      d3.select('#player-games-chart').selectAll('rect')
+        .attr('fill', d => d && +d.win === 1 ? GAME_WIN_COLOR : GAME_LOSS_COLOR);
+      document.querySelectorAll('#player-calendar [data-date]').forEach(el => {
+        el.style.stroke = ''; el.style.strokeWidth = '';
+      });
+      const popup = statsArea.querySelector('.game-popup');
+      if (popup) popup.style.display = 'none';
+    };
+
     const rerenderShotChart = () => {
       if (reqId !== playerStatsReqId) return;
       const filters = getShotFilters(container);
-      drawShotChart(chartEl, applyShotFilters(allShots, filters));
+      drawShotChart(chartEl, applyShotFilters(allShots, filters), { onShotHover: onGameHover, onShotLeave: onGameLeave });
       d3.select(chartEl).attr("viewBox", "0 20 440 424").attr("preserveAspectRatio", "xMidYMid meet");
     };
 
@@ -1802,11 +1840,14 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
         }
       }
 
+      gameContext.gamesById = new Map(games.map(g => [String(g.gameId), g]));
+
       const primaryTeam = [...teamsPlayed]
         .sort((a, b) => b.gameCount - a.gameCount || a.firstIndex - b.firstIndex)[0];
       if (primaryTeam) {
         const metaRow = primaryTeam.metaRow;
         const colorA = resolveColor(metaRow.Color1, resolveColor(metaRow.Color3, '#005ce6'));
+        gameContext.teamColor = colorA;
         const colorB = resolveColor(metaRow.Color2, resolveColor(metaRow.Color3, 'rgba(80,80,80,0.7)'));
         const teamLogoUrls = [...teamsPlayed]
           .sort((a, b) => a.firstIndex - b.firstIndex)
@@ -1820,15 +1861,15 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
         if (legendAverage) legendAverage.style.color = colorB;
         built.radar.update(dataPoints, TRANSITION_TIME, built);
         renderAverages(container.querySelector('.player-averages'), games);
-        renderCalendarHeatmap(games, currentYear, statsArea, colorA);
-        renderGamesChart(document.getElementById('player-games-chart'), games, colorA);
+        renderCalendarHeatmap(games, currentYear, statsArea, colorA, onGameHover, onGameLeave);
+        renderGamesChart(document.getElementById('player-games-chart'), games, colorA, onGameHover, onGameLeave);
         return;
       }
 
       renderTopTeamLogos(container, []);
       renderAverages(container.querySelector('.player-averages'), games);
-      renderCalendarHeatmap(games, currentYear, statsArea);
-      renderGamesChart(document.getElementById('player-games-chart'), games);
+      renderCalendarHeatmap(games, currentYear, statsArea, '#0f3285', onGameHover, onGameLeave);
+      renderGamesChart(document.getElementById('player-games-chart'), games, '#005ce6', onGameHover, onGameLeave);
       });
     });
   }, yearChanged ? TRANSITION_TIME : 0);

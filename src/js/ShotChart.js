@@ -8,7 +8,7 @@ let _shotRequestId = 0;
 // Court occupies x: 0–435, y: 36–444 in SVG space. Crop to remove dead space.
 const COURT_VIEWBOX = "0 20 440 424";
 
-export function drawShotChart(svgEl, shots) {
+export function drawShotChart(svgEl, shots, { onShotHover, onShotLeave } = {}) {
   const svg = d3.select(svgEl);
   svg.selectAll("*").remove();
 
@@ -36,6 +36,7 @@ export function drawShotChart(svgEl, shots) {
   const MADE_COLOR = "#14ad4c";
   const MISSED_COLOR = "#d21818";
   const CROSS_HALF = 5.5;
+  const hasHover = onShotHover && onShotLeave;
 
   svg.selectAll(".shot-made")
     .data(made)
@@ -48,14 +49,20 @@ export function drawShotChart(svgEl, shots) {
     .attr("fill-opacity", 0.25)
     .attr("stroke", MADE_COLOR)
     .attr("stroke-width", 1.5)
-    .attr("opacity", 0.85);
+    .attr("opacity", 0.85)
+    .style("cursor", hasHover ? "pointer" : null)
+    .on("mouseover", hasHover ? (event, d) => onShotHover(d.gameId, event) : null)
+    .on("mouseout",  hasHover ? () => onShotLeave() : null);
 
   const crossGroup = svg.selectAll(".shot-missed")
     .data(missed)
     .join("g")
     .attr("class", "shot-missed")
     .attr("transform", d => `translate(${toSvgX(+d.locX)},${toSvgY(+d.locY)})`)
-    .attr("opacity", 0.8);
+    .attr("opacity", 0.8)
+    .style("cursor", hasHover ? "pointer" : null)
+    .on("mouseover", hasHover ? (event, d) => onShotHover(d.gameId, event) : null)
+    .on("mouseout",  hasHover ? () => onShotLeave() : null);
 
   crossGroup.append("line")
     .attr("x1", -CROSS_HALF).attr("y1", -CROSS_HALF)
@@ -66,6 +73,21 @@ export function drawShotChart(svgEl, shots) {
     .attr("x1",  CROSS_HALF).attr("y1", -CROSS_HALF)
     .attr("x2", -CROSS_HALF).attr("y2",  CROSS_HALF)
     .attr("stroke", MISSED_COLOR).attr("stroke-width", 1.8).attr("stroke-linecap", "round");
+}
+
+export function highlightShotsByGame(svgEl, gameId) {
+  const svg = d3.select(svgEl);
+  if (!gameId) {
+    svg.selectAll('.shot-made').attr('opacity', 0.85);
+    svg.selectAll('.shot-missed').attr('opacity', 0.8);
+    return;
+  }
+  const gid = String(gameId);
+  svg.selectAll('.shot-made')
+    .attr('opacity', d => String(d.gameId) === gid ? 1 : 0.06)
+    .attr('r', d => String(d.gameId) === gid ? 6 : 5);
+  svg.selectAll('.shot-missed')
+    .attr('opacity', d => String(d.gameId) === gid ? 1 : 0.06);
 }
 
 function getShotFile(season) {
