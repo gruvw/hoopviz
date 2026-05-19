@@ -74,8 +74,8 @@ const RADAR_AXES = 6;
 const EVOLUTION_COLOR_A = "#2e7d32";
 const EVOLUTION_COLOR_B = "#1e40af";
 const EVOLUTION_TOOLTIP_PADDING = 12;
-const GAME_WIN_COLOR = "rgba(79, 174, 132, 0.82)";
-const GAME_LOSS_COLOR = "rgba(200, 107, 99, 0.44)";
+const GAME_WIN_COLOR = "rgba(20, 173, 76, 0.84)";
+const GAME_LOSS_COLOR = "rgba(210, 24, 24, 0.62)";
 
 // stores the in-flight promise, not the resolved data, concurrent callers get the same promise instead of firing duplicate fetches
 const csvCache = new Map();
@@ -1314,11 +1314,12 @@ function fmtDate(str) {
 }
 
 function getShotFilters(container) {
-  const madeSelect = container.querySelector('#shot-filter-made');
-  const valueSelect = container.querySelector('#shot-filter-value');
+  const madePills = container.querySelector('#shot-filter-made');
+  const valuePills = container.querySelector('#shot-filter-value');
+  const activeBtn = el => el ? (el.querySelector('.shot-filter-btn.active') || {}).dataset?.value ?? 'all' : 'all';
   return {
-    made: madeSelect ? madeSelect.value : 'all',
-    shotValue: valueSelect ? valueSelect.value : 'all',
+    made: activeBtn(madePills),
+    shotValue: activeBtn(valuePills),
   };
 }
 
@@ -1332,11 +1333,15 @@ function applyShotFilters(shots, filters) {
 }
 
 function wireShotFilterControls(container, onChange) {
-  const madeSelect = container.querySelector('#shot-filter-made');
-  const valueSelect = container.querySelector('#shot-filter-value');
-  if (!madeSelect || !valueSelect) return;
-  madeSelect.onchange = onChange;
-  valueSelect.onchange = onChange;
+  container.querySelectorAll('.shot-filter-pills').forEach(pills => {
+    pills.querySelectorAll('.shot-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pills.querySelectorAll('.shot-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        onChange();
+      });
+    });
+  });
 }
 
 function renderAverages(el, games) {
@@ -1723,6 +1728,10 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
       drawShotChart(chartEl, applyShotFilters(allShots, filters));
       d3.select(chartEl).attr("viewBox", "0 20 440 424").attr("preserveAspectRatio", "xMidYMid meet");
     };
+
+    container.querySelectorAll('.shot-filter-pills').forEach(pills => {
+      pills.querySelectorAll('.shot-filter-btn').forEach((btn, i) => btn.classList.toggle('active', i === 0));
+    });
 
     wireShotFilterControls(container, rerenderShotChart);
 

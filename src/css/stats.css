@@ -1049,28 +1049,55 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 14px;
   flex-wrap: wrap;
   z-index: 2;
   flex-shrink: 0;
 }
 
-.shot-chart-filters label {
+.shot-filter-group {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.72);
+  gap: 5px;
 }
 
-.shot-chart-filters select {
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.86);
-  color: #222;
-  font-size: 11px;
-  padding: 4px 8px;
+.shot-filter-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.shot-filter-pills {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: #1a1a1a;
+  border-radius: 50px;
+}
+
+.shot-filter-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 5px 14px;
+  border-radius: 50px;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+}
+
+.shot-filter-btn:hover:not(.active) {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.shot-filter-btn.active {
+  background: #ef6c32;
+  color: #fff;
 }
 
 .player-shot-chart-card #player-chart {

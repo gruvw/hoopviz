@@ -33,30 +33,39 @@ export function drawShotChart(svgEl, shots) {
   const made = filtered.filter(d => +d.shotMade === 1);
   const missed = filtered.filter(d => +d.shotMade === 0);
 
-  svg.selectAll("circle")
+  const MADE_COLOR = "#14ad4c";
+  const MISSED_COLOR = "#d21818";
+  const CROSS_HALF = 5.5;
+
+  svg.selectAll(".shot-made")
     .data(made)
     .join("circle")
+    .attr("class", "shot-made")
     .attr("cx", d => toSvgX(+d.locX))
     .attr("cy", d => toSvgY(+d.locY))
-    .attr("r", 7)
-    .attr("fill", "none")
-    .attr("stroke", "#46a47a")
+    .attr("r", 5)
+    .attr("fill", MADE_COLOR)
+    .attr("fill-opacity", 0.25)
+    .attr("stroke", MADE_COLOR)
     .attr("stroke-width", 1.5)
-    .attr("opacity", 0.7);
+    .attr("opacity", 0.85);
 
-  svg.selectAll(".cross")
+  const crossGroup = svg.selectAll(".shot-missed")
     .data(missed)
-    .join("text")
-    .attr("class", "cross")
-    .attr("x", d => toSvgX(+d.locX))
-    .attr("y", d => toSvgY(+d.locY))
-    .attr("text-anchor", "middle")
-    .attr("dominant-baseline", "central")
-    .attr("font-size", 20)
-    .attr("font-weight", 300)
-    .attr("fill", "#c7645c")
-    .attr("opacity", 0.7)
-    .text("✕");
+    .join("g")
+    .attr("class", "shot-missed")
+    .attr("transform", d => `translate(${toSvgX(+d.locX)},${toSvgY(+d.locY)})`)
+    .attr("opacity", 0.8);
+
+  crossGroup.append("line")
+    .attr("x1", -CROSS_HALF).attr("y1", -CROSS_HALF)
+    .attr("x2",  CROSS_HALF).attr("y2",  CROSS_HALF)
+    .attr("stroke", MISSED_COLOR).attr("stroke-width", 1.8).attr("stroke-linecap", "round");
+
+  crossGroup.append("line")
+    .attr("x1",  CROSS_HALF).attr("y1", -CROSS_HALF)
+    .attr("x2", -CROSS_HALF).attr("y2",  CROSS_HALF)
+    .attr("stroke", MISSED_COLOR).attr("stroke-width", 1.8).attr("stroke-linecap", "round");
 }
 
 function getShotFile(season) {
