@@ -212,22 +212,22 @@
             </div>
             <div class="player-shot-chart-card">
               <div class="shot-chart-filters">
-                <label>
-                  Result
-                  <select id="shot-filter-made">
-                    <option value="all">All</option>
-                    <option value="made">Made</option>
-                    <option value="missed">Missed</option>
-                  </select>
-                </label>
-                <label>
-                  Shot Value
-                  <select id="shot-filter-value">
-                    <option value="all">All</option>
-                    <option value="2">2PT</option>
-                    <option value="3">3PT</option>
-                  </select>
-                </label>
+                <div class="shot-filter-group">
+                  <span class="shot-filter-label">Result</span>
+                  <div class="shot-filter-pills" id="shot-filter-made">
+                    <span class="shot-filter-btn active" data-value="all">All</span>
+                    <span class="shot-filter-btn" data-value="made">Made</span>
+                    <span class="shot-filter-btn" data-value="missed">Missed</span>
+                  </div>
+                </div>
+                <div class="shot-filter-group">
+                  <span class="shot-filter-label">Shot Value</span>
+                  <div class="shot-filter-pills" id="shot-filter-value">
+                    <span class="shot-filter-btn active" data-value="all">All</span>
+                    <span class="shot-filter-btn" data-value="2">2PT</span>
+                    <span class="shot-filter-btn" data-value="3">3PT</span>
+                  </div>
+                </div>
               </div>
               <svg id="player-chart"></svg>
               <p class="shot-chart-attribution">Court diagram: <a href="https://www.snater.com" target="_blank" rel="noopener">snater.com</a> (CC BY-SA 4.0) via Wikimedia Commons. Modified.</p>
