@@ -934,22 +934,95 @@
   text-align: center;
 }
 
-.player-card-title {
-  font-size: 14px;
-  font-weight: 700;
-  text-align: center;
-  color: #000000;
-  letter-spacing: 0.06em;
+.player-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   flex-shrink: 0;
 }
 
-.player-cal-col {
+.player-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #000000;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+.games-chart-wrapper {
+  position: relative;
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: 8px 12px;
+  min-height: 0;
+}
+
+.game-metric-selector-wrapper {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.game-metric-selector {
+  position: relative;
+  pointer-events: auto;
+}
+
+.game-metric-selector > span {
+  display: block;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background-color: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  color: white;
+  padding: 6px 10px;
+  width: max-content;
+  user-select: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.game-metric-dropdown {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  position: absolute;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background-color: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.game-metric-dropdown span {
+  display: block;
+  width: 100%;
+  padding: 3px 6px;
+  border-radius: 4px;
+  user-select: none;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.game-metric-dropdown span:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.game-metric-selector > span:hover {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.game-metric-selector.open .game-metric-dropdown {
+  display: flex;
 }
 
 .player-averages {
@@ -1088,6 +1161,7 @@
 .player-history-card {
   flex: 1;
   min-height: 0;
+  display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 12px;
@@ -1184,9 +1258,9 @@
 }
 
 .player-games-col {
-  flex: 1;
   display: flex;
   min-height: 0;
+  flex: 1;
 }
 
 #player-games-chart {
@@ -1194,7 +1268,7 @@
   width: 100%;
   height: 100%;
   flex: 1;
-  min-height: 0;
+  min-height: 200px;
 }
 
 .game-popup {

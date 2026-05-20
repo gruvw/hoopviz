@@ -203,11 +203,20 @@
               </div>
               <div class="player-history-card">
                 <div class="player-card-title">Game History</div>
-                <div class="player-cal-col">
-                  <div id="player-calendar"></div>
-                </div>
-                <div class="player-games-col">
+                <div class="games-chart-wrapper">
                   <svg id="player-games-chart"></svg>
+                  <div class="game-metric-selector-wrapper">
+                    <div class="game-metric-selector">
+                      <span id="game-metric-display">Points</span>
+                      <div class="game-metric-dropdown">
+                        <span data-value="points">Points</span>
+                        <span data-value="assists">Assists</span>
+                        <span data-value="rebounds">Rebounds</span>
+                        <span data-value="blocks">Blocks</span>
+                        <span data-value="steals">Steals</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
