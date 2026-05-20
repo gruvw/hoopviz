@@ -911,7 +911,7 @@
 }
 
 .player-stats-col {
-  flex: 0 0 200px;
+  flex: 0 0 30%;
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -961,7 +961,6 @@
   position: absolute;
   bottom: 8px;
   left: 50%;
-  transform: translateX(-50%);
   z-index: 10;
   pointer-events: none;
 }
@@ -1347,18 +1346,15 @@
 .player-awards-container {
   position: absolute;
   bottom: 8px;
-  left: 8px;
-  right: 8px;
-  height: 50px;
+  height: 60px;
   display: flex;
-  align-items: stretch;
   gap: 3px;
   z-index: 2;
 }
 
 .player-award {
   flex: 1;
-  max-width: 52px;
+  max-width: 80px;
   min-width: 0;
   display: flex;
   align-items: center;

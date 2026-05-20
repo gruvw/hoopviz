@@ -1572,11 +1572,10 @@ function getMetricValue(game, metric) {
 
 function wireGameHistoryMetricSelector(container, svgEl, games, teamColor, onGameHover, onGameLeave) {
   const selectorWrapper = container.querySelector('.game-metric-selector');
-  const displayEl = container.querySelector('#game-metric-display');
   const dropdownEl = container.querySelector('.game-metric-dropdown');
-  const optionEls = container.querySelectorAll('.game-metric-dropdown span');
+  const displayEl = container.querySelector('#game-metric-display');
 
-  if (!selectorWrapper || !displayEl || !dropdownEl) return;
+  if (!selectorWrapper || !dropdownEl || !displayEl) return;
 
   const metricLabels = {
     points: 'Points',
@@ -1586,34 +1585,44 @@ function wireGameHistoryMetricSelector(container, svgEl, games, teamColor, onGam
     steals: 'Steals'
   };
 
-  let currentMetric = 'points';
+  // Get saved metric or default to 'points'
+  let currentMetric = selectorWrapper.dataset.currentMetric || 'points';
 
   const renderChart = (metric = currentMetric) => {
     currentMetric = metric;
+    selectorWrapper.dataset.currentMetric = metric;
+    displayEl.textContent = metricLabels[metric];
     renderGamesChart(svgEl, games, teamColor, onGameHover, onGameLeave, metric);
   };
 
-  renderChart();
-
-  displayEl.addEventListener('click', () => {
-    selectorWrapper.classList.toggle('open');
+  // Wait for DOM layout to stabilize
+  requestAnimationFrame(() => {
+    setTimeout(() => renderChart(), 0);
   });
 
-  optionEls.forEach(optionEl => {
-    optionEl.addEventListener('click', () => {
+  // Use event delegation on the selector wrapper
+  selectorWrapper.removeEventListener('click', selectorWrapper._boundClickHandler);
+  selectorWrapper._boundClickHandler = (e) => {
+    const optionEl = e.target.closest('.game-metric-dropdown span');
+
+    if (e.target === displayEl) {
+      selectorWrapper.classList.toggle('open');
+    } else if (optionEl) {
       const metric = optionEl.dataset.value;
-      currentMetric = metric;
-      displayEl.textContent = metricLabels[metric];
       selectorWrapper.classList.remove('open');
       renderChart(metric);
-    });
-  });
+    }
+  };
+  selectorWrapper.addEventListener('click', selectorWrapper._boundClickHandler);
 
-  document.addEventListener('click', (e) => {
+  // Close dropdown when clicking outside
+  document.removeEventListener('click', window._gameHistoryCloseHandler);
+  window._gameHistoryCloseHandler = (e) => {
     if (!selectorWrapper.contains(e.target)) {
       selectorWrapper.classList.remove('open');
     }
-  });
+  };
+  document.addEventListener('click', window._gameHistoryCloseHandler);
 }
 
 function renderGamesChart(svgEl, games, teamColor = '#005ce6', onGameHover = null, onGameLeave = null, metric = 'points') {
