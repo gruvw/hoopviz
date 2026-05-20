@@ -1064,7 +1064,7 @@ export function makeRadarBuild(radarId, options = {}) {
     const marginSize = options.margin || 80;
     const width = size;
     const height = size;
-    const margin = { top: marginSize, right: marginSize, bottom: marginSize, left: marginSize };
+    const margin = { top: marginSize + 25, right: marginSize, bottom: marginSize, left: marginSize };
 
     const color = options.color || ["#CC333F"];
     const scaleRatio = Math.min(width, height) / 200;
