@@ -5,7 +5,11 @@ While most basketball statistics sites feel like looking at a tax return, we wan
 
 By using multiple seasons of data, we are building a "time-traveling" experience where users can slide through history to see how the league has evolved over the years with interesting transitions.
 
-**Live demo: <https://com-480-data-visualization.github.io/HoopViz/>**
+**Live Website: <https://com-480-data-visualization.github.io/HoopViz/>**
+
+**Video Demo:** TODO
+
+## Deliverables
 
 Project of Data Visualization (EPFL COM-480) - 2026
 
@@ -14,8 +18,6 @@ Project of Data Visualization (EPFL COM-480) - 2026
 | Lucas Jung | 324724 |
 | Anasse El Boudiri | 374212 |
 | Sam Lee | 375535 |
-
-## Deliverables
 
 - [Milestone 1](./deliverables/ms1/ms1.md)
 - [Milestone 2](./deliverables/ms2/ms2.pdf)
@@ -32,6 +34,8 @@ Those three metrics are user customizable from a list of common interesting ones
 To change a metric, the user can click on any of the three axes and select one they would like from the dropdown that appears.
 All the teams will then re-organize based on this new metric choice, with animated transitions.
 
+<img width="600" src="./deliverables/images/teams_map.png">
+
 Additionally, at the top of the map, the user can interact with a seasons/year slider.
 They can either drag and drop the slider's handle, or use their keyboard's left and right arrow keys, to transition from year to year.
 They could also just click anywhere on the slider to jump directly to that year.
@@ -40,14 +44,27 @@ The animated transitions are particularly useful there because we can follow tea
 
 The user can also click on any team of their choice to open a specialized dashboard for that team, revealing key insights and additional visualizations, tailored to that team and to the currently selected year.
 On that page, the user can notably see a radar chart visualization displaying some important normalized metrics about their performance.
-The three metrics at the top are fixed to the same ones that were used to positioned them on the map, and all the other ones are again fully user customizable by clicking on them and selecting a particular one of interest from the dropdown.
+The three metrics at the top are fixed to the same ones that were used to position them on the map, and all the other ones are again fully user customizable by clicking on them and selecting a particular one of interest from the dropdown.
+Many other graphs and interesting visualizations are displayed on that team dashboard page: general season stats, best and worst opponents, and a game-by-game line chart with customizable axes showing the evolution of two chosen metrics for each game of the season.
+Don't hesitate to hover over those visualizations as it will reveal even more detailed data about the specific info you're hovering over!
 Of course, on that team dashboard page the same year slider at the top is still working, and the user can browse the dashboard's data through time as well, with animated transitions.
+
+<img width="600" src="./deliverables/images/team_dashboard.png">
 
 At the very top of the website there is a selector to chose between two types of map.
 By default it is that NBA teams map visualization that we see, but we also offer to view a map of the individual NBA players by clicking on that "Players" button.
+
+<img width="600" src="./deliverables/images/players_map.png">
+
 The players map has the same features as the teams map, and clicking on any player will also open their dedicated dashboard page.
 On this page we can find the same radar chart with customizable metrics selection.
-The user will also find a player shot map visualization on the right, where they can see all of the positions where that player shot during their games that year.
+Additionally, this page showcases a shot map where each shot the player attempted during their games that year is overlaid on the court diagram.
+Each shot is displayed as a green circle if it scored points, or as a red cross if it didn't.
+That allows for seeing where the player is the most comfortable shooting positions and if they have a side or area where they tend to make shots more often than not.
+The user can use the available filters on top of this chart to only show three pointers or only shots that missed for example.
+There is a shared interactivity between the shot map visualization and the game history chart to its left: when you hover over a shot position, or over a game in the game history, the visualization will filter to only show you shots from that particular game, and it will display a nice information window with additional data about the game!
+
+<img width="600" src="./deliverables/images/player_dashboard.png">
 
 ## Development setup
 
