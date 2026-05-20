@@ -1344,33 +1344,69 @@ function wireShotFilterControls(container, onChange) {
   });
 }
 
-function renderAverages(el, games) {
+function renderAverages(el, games, teamColor) {
   el.innerHTML = '';
   if (!games.length) return;
   const wins = games.filter(r => +r.win === 1).length;
-  const defs = [
-    ['Games played', `${games.length} games`],
-    ['Record', `${wins}W - ${games.length - wins}L`],
-    ['Points per game', `${fmt(colAvg(games, 'points'), 1)} pts`],
-    ['Rebounds per game', `${fmt(colAvg(games, 'reboundsTotal'), 1)} reb`],
-    ['Assists per game', `${fmt(colAvg(games, 'assists'), 1)} ast`],
-    ['Steals per game', `${fmt(colAvg(games, 'steals'), 1)} stl`],
-    ['Blocks per game', `${fmt(colAvg(games, 'blocks'), 1)} blk`],
-    ['Field goal %', `${fmt(colAvg(games, 'fieldGoalsPercentage') * 100, 1)}%`],
-    ['Three point %', `${fmt(colAvg(games, 'threePointersPercentage') * 100, 1)}%`],
-    ['Plus / minus', `${fmtPM(colAvg(games, 'plusMinusPoints'))}`],
+  const losses = games.length - wins;
+
+  const sections = [
+    {
+      title: 'Overview',
+      rows: [
+        ['Games', `${games.length}`],
+        ['Record', `${wins}W – ${losses}L`],
+        ['Min / game', `${fmt(colAvg(games, 'numMinutes'), 1)}`],
+        ['Plus / minus', fmtPM(colAvg(games, 'plusMinusPoints'))],
+      ],
+    },
+    {
+      title: 'Scoring',
+      rows: [
+        ['Points / game', fmt(colAvg(games, 'points'), 1), true],
+        ['FG%', `${fmt(colAvg(games, 'fieldGoalsPercentage') * 100, 1)}%`],
+        ['3P%', `${fmt(colAvg(games, 'threePointersPercentage') * 100, 1)}%`],
+        ['FT%', `${fmt(colAvg(games, 'freeThrowsPercentage') * 100, 1)}%`],
+      ],
+    },
+    {
+      title: 'Contribution',
+      rows: [
+        ['Rebounds / game', fmt(colAvg(games, 'reboundsTotal'), 1), true],
+        ['Assists / game', fmt(colAvg(games, 'assists'), 1), true],
+        ['Steals / game', fmt(colAvg(games, 'steals'), 1)],
+        ['Blocks / game', fmt(colAvg(games, 'blocks'), 1)],
+        ['Turnovers / game', fmt(colAvg(games, 'turnovers'), 1)],
+        ['Fouls / game', fmt(colAvg(games, 'foulsPersonal'), 1)],
+      ],
+    },
   ];
-  defs.forEach(([label, valueText]) => {
-    const item = document.createElement('div');
-    item.className = 'summary-item';
-    const lbl = document.createElement('span');
-    lbl.className = 'summary-label';
-    lbl.textContent = label;
-    const num = document.createElement('span');
-    num.className = 'summary-value';
-    num.textContent = valueText;
-    item.append(lbl, num);
-    el.append(item);
+
+  if (teamColor) el.style.setProperty('--player-stat-color', teamColor);
+
+  sections.forEach(({ title, rows }) => {
+    const section = document.createElement('div');
+    section.className = 'player-stats-section';
+
+    const sectionTitle = document.createElement('div');
+    sectionTitle.className = 'player-stats-section-title';
+    sectionTitle.textContent = title;
+    section.appendChild(sectionTitle);
+
+    rows.forEach(([label, value, highlight]) => {
+      const row = document.createElement('div');
+      row.className = 'player-stat-row';
+      const lbl = document.createElement('span');
+      lbl.className = 'player-stat-label';
+      lbl.textContent = label;
+      const val = document.createElement('span');
+      val.className = 'player-stat-value' + (highlight ? ' highlight' : '');
+      val.textContent = value;
+      row.append(lbl, val);
+      section.appendChild(row);
+    });
+
+    el.appendChild(section);
   });
 }
 
@@ -1860,14 +1896,14 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
         if (legendPlayer) legendPlayer.style.color = colorA;
         if (legendAverage) legendAverage.style.color = colorB;
         built.radar.update(dataPoints, TRANSITION_TIME, built);
-        renderAverages(container.querySelector('.player-averages'), games);
+        renderAverages(container.querySelector('.player-averages'), games, colorA);
         renderCalendarHeatmap(games, currentYear, statsArea, colorA, onGameHover, onGameLeave);
         renderGamesChart(document.getElementById('player-games-chart'), games, colorA, onGameHover, onGameLeave);
         return;
       }
 
       renderTopTeamLogos(container, []);
-      renderAverages(container.querySelector('.player-averages'), games);
+      renderAverages(container.querySelector('.player-averages'), games, '#005ce6');
       renderCalendarHeatmap(games, currentYear, statsArea, '#0f3285', onGameHover, onGameLeave);
       renderGamesChart(document.getElementById('player-games-chart'), games, '#005ce6', onGameHover, onGameLeave);
       });
