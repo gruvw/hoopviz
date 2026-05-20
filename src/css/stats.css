@@ -134,19 +134,44 @@
     width: 100%;
     height: 100%;
     display: grid;
-    grid-template-columns: minmax(200px, 0.9fr) minmax(360px, 2.2fr) minmax(220px, 1fr);
+    grid-template-columns: 1fr 1.8fr 1.2fr 1.1fr;
     grid-template-rows: minmax(230px, 1fr) minmax(270px, 1.05fr);
     gap: 14px;
     align-items: stretch;
 }
 
-.stats-info {
+.team-identity-card {
     grid-column: 1;
     grid-row: 1;
-    display: grid;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 12px;
-    height: 100%;
+    text-align: center;
+}
+
+.team-identity-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.team-fullname {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #111;
+    margin: 0;
+}
+
+.team-record-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    margin-top: 4px;
 }
 
 .info-card {
@@ -242,8 +267,54 @@
 }
 
 .radar-card .radar {
-    transform: scale(0.78);
+    transform: scale(0.92);
     transform-origin: center;
+}
+
+.team-season-stats-col {
+    grid-column: 3;
+    grid-row: 1;
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.team-averages {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+    overflow-y: scroll;
+    flex: 1;
+    min-height: 0;
+    scrollbar-width: auto;
+    scrollbar-color: rgba(0,0,0,0.25) rgba(0,0,0,0.06);
+    padding-right: 2px;
+}
+
+.team-averages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.team-averages::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.06);
+    border-radius: 6px;
+}
+
+.team-averages::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.25);
+    border-radius: 6px;
+}
+
+.team-averages::-webkit-scrollbar-thumb:hover {
+    background: rgba(0,0,0,0.4);
 }
 
 .radar-legend {
@@ -286,7 +357,7 @@
 }
 
 .evolution {
-    grid-column: 1 / span 2;
+    grid-column: 1 / span 3;
     grid-row: 2;
     width: 100%;
     max-width: none;
@@ -301,7 +372,7 @@
 }
 
 .stats-right {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1 / span 2;
     display: grid;
     grid-template-rows: 1fr 1fr;

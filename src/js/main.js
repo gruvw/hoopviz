@@ -22,7 +22,7 @@ new Screens({
     bubbleLogo: (row) => row["teamSlug"],
     statsUpdate: Stats.updateTeamStats,
     attributes: Stats.TEAM_ATTRIBUTES,
-    build: Stats.makeRadarBuild("#team-radar", { size: 210 }),
+    build: Stats.makeRadarBuild("#team-radar", { size: 165 }),
   }),
   // players BubbleMap
   rightBubbleMap: new BubbleMap({

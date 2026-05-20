@@ -69,32 +69,18 @@
           <p class="content"></p>
 
           <div class="stats-layout">
-            <div class="stats-info">
-              <div class="info-card logo-card">
-                <img class="stats-logo" alt="Team logo" hidden>
-              </div>
-              <div class="info-card summary-card">
-                <div class="stats-header">
-                  <h1 class="name"></h1>
-                  <h2 class="year"></h2>
-                  <p class="content"></p>
-                </div>
-                <div class="summary-list">
+            <div class="team-identity-card info-card">
+              <img class="stats-logo" alt="Team logo" hidden>
+              <div class="team-identity-info">
+                <h2 class="team-fullname"></h2>
+                <div class="team-record-list">
                   <div class="summary-item">
-                    <span class="summary-label">Regular season rank</span>
+                    <span class="summary-label">Regular season</span>
                     <span class="summary-value summary-rank-regular">--</span>
                   </div>
                   <div class="summary-item">
-                    <span class="summary-label">Playoffs rank</span>
+                    <span class="summary-label">Playoffs</span>
                     <span class="summary-value summary-rank-playoffs">--</span>
-                  </div>
-                  <div class="summary-item">
-                    <span class="summary-label">City</span>
-                    <span class="summary-value summary-city">--</span>
-                  </div>
-                  <div class="summary-item">
-                    <span class="summary-label">Team</span>
-                    <span class="summary-value summary-team">--</span>
                   </div>
                 </div>
               </div>
@@ -105,6 +91,10 @@
                 <span class="legend-item average">Teams average</span>
               </div>
               <div class="radar" id="team-radar"></div>
+            </div>
+            <div class="team-season-stats-col">
+              <div class="player-stats-title">Season Stats</div>
+              <div class="team-averages"></div>
             </div>
             <div class="evolution">
               <div class="evolution-header">

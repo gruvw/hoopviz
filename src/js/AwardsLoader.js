@@ -34,32 +34,25 @@ export class AwardsLoader {
   };
 
   constructor() {
-    console.log("AwardsLoader: constructor called");
   }
 
   async load() {
-    console.log("AwardsLoader: starting load");
     try {
       // Load Player Award Shares (MVP, DPOY, ROY)
       const awardSharesResponse = await fetch("data/nba_awards/Player%20Award%20Shares.csv");
-      console.log("AwardsLoader: fetched Player Award Shares, status:", awardSharesResponse.status);
       const awardSharesText = await awardSharesResponse.text();
       this.#parseAwardShares(awardSharesText);
-      console.log("AwardsLoader: parsed award shares, count:", this.#awardSharesData.length);
 
       // Load End of Season Teams (All-NBA, All-Rookie, All-Defense)
       const endOfSeasonResponse = await fetch("data/nba_awards/End%20of%20Season%20Teams.csv");
-      console.log("AwardsLoader: fetched End of Season Teams, status:", endOfSeasonResponse.status);
       const endOfSeasonText = await endOfSeasonResponse.text();
       this.#parseEndOfSeasonTeams(endOfSeasonText);
-      console.log("AwardsLoader: parsed end of season teams, count:", this.#endOfSeasonTeamsData.length);
+      const endOfSeasonTeamsCount = this.#endOfSeasonTeamsData.length;
 
       // Load All-Star Selections
       const allStarResponse = await fetch("data/nba_awards/All-Star%20Selections.csv");
-      console.log("AwardsLoader: fetched All-Star Selections, status:", allStarResponse.status);
       const allStarText = await allStarResponse.text();
       this.#parseAllStar(allStarText);
-      console.log("AwardsLoader: parsed all-star, count:", this.#allStarData.length);
     } catch (error) {
       console.error("AwardsLoader: Failed to load awards data:", error);
     }
@@ -137,7 +130,6 @@ export class AwardsLoader {
     const yearStr = String(year);
     const nameToMatch = String(playerName).trim();
 
-    console.log("getPlayerAwardsByName:", { playerName: nameToMatch, year: yearStr, maxAwards });
 
     // Check Player Award Shares (MVP, DPOY, ROY, MIP, SMOY, CLUTCH_POY)
     const awardShares = this.#awardSharesData.filter(
@@ -230,7 +222,6 @@ export class AwardsLoader {
       awards.splice(maxAwards);
     }
 
-    console.log("Final awards:", awards);
     return awards;
   }
 

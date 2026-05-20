@@ -1210,9 +1210,11 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   const rankPlayoffsEl = container.querySelector(".summary-rank-playoffs");
   const cityEl = container.querySelector(".summary-city");
   const teamEl = container.querySelector(".summary-team");
+  const fullnameEl = container.querySelector(".team-fullname");
 
   if (cityEl) cityEl.textContent = teamCity || "--";
   if (teamEl) teamEl.textContent = teamName || "--";
+  if (fullnameEl) fullnameEl.textContent = displayName || "--";
 
   // snapshot the ids before the async gap so we can bail if the user switched teams in the meantime
   const summaryTargetId = String(teamId);
@@ -1276,6 +1278,21 @@ export function updateTeamStats(container, built, seasonsLoader, metadataLoader,
   built.gameType = gameType;
   built.colors = [colorA, colorB];
   built.radar.update(dataPoints, TRANSITION_TIME, built);
+
+  const teamAvgEl = container.querySelector('.team-averages');
+  if (teamAvgEl) {
+    loadCsv('./data/team_games.csv').then(rows => {
+      if (String(teamId) !== summaryTargetId || String(currentYear) !== summaryTargetYear) return;
+      const games = rows.filter(r =>
+        r.season === String(currentYear) &&
+        r.teamId === String(teamId) &&
+        r.gameType === gameType
+      );
+      renderTeamAverages(teamAvgEl, games, colorA);
+    }).catch(() => {
+      teamAvgEl.innerHTML = '';
+    });
+  }
 
   updateEvolutionChart(container, currentYear, teamId, built);
   updateMatchups(container, currentYear, teamId, metadataLoader, gameType);
@@ -1373,6 +1390,72 @@ function renderAverages(el, games, teamColor) {
       title: 'Contribution',
       rows: [
         ['Rebounds / game', fmt(colAvg(games, 'reboundsTotal'), 1), true],
+        ['Assists / game', fmt(colAvg(games, 'assists'), 1), true],
+        ['Steals / game', fmt(colAvg(games, 'steals'), 1)],
+        ['Blocks / game', fmt(colAvg(games, 'blocks'), 1)],
+        ['Turnovers / game', fmt(colAvg(games, 'turnovers'), 1)],
+        ['Fouls / game', fmt(colAvg(games, 'foulsPersonal'), 1)],
+      ],
+    },
+  ];
+
+  if (teamColor) el.style.setProperty('--player-stat-color', teamColor);
+
+  sections.forEach(({ title, rows }) => {
+    const section = document.createElement('div');
+    section.className = 'player-stats-section';
+
+    const sectionTitle = document.createElement('div');
+    sectionTitle.className = 'player-stats-section-title';
+    sectionTitle.textContent = title;
+    section.appendChild(sectionTitle);
+
+    rows.forEach(([label, value, highlight]) => {
+      const row = document.createElement('div');
+      row.className = 'player-stat-row';
+      const lbl = document.createElement('span');
+      lbl.className = 'player-stat-label';
+      lbl.textContent = label;
+      const val = document.createElement('span');
+      val.className = 'player-stat-value' + (highlight ? ' highlight' : '');
+      val.textContent = value;
+      row.append(lbl, val);
+      section.appendChild(row);
+    });
+
+    el.appendChild(section);
+  });
+}
+
+function renderTeamAverages(el, games, teamColor) {
+  el.innerHTML = '';
+  if (!games.length) return;
+  const wins = games.filter(r => +r.win === 1).length;
+  const losses = games.length - wins;
+
+  const sections = [
+    {
+      title: 'Overview',
+      rows: [
+        ['Games', `${games.length}`],
+        ['Record', `${wins}W – ${losses}L`],
+        ['Points / game', fmt(colAvg(games, 'teamScore'), 1), true],
+        ['Points Allowed / game', fmt(colAvg(games, 'opponentScore'), 1)],
+        ['Plus / minus', fmtPM(colAvg(games, 'plusMinusPoints'))],
+      ],
+    },
+    {
+      title: 'Shooting',
+      rows: [
+        ['FG%', `${fmt(colAvg(games, 'fieldGoalsPercentage') * 100, 1)}%`],
+        ['3P%', `${fmt(colAvg(games, 'threePointersPercentage') * 100, 1)}%`],
+        ['FT%', `${fmt(colAvg(games, 'freeThrowsPercentage') * 100, 1)}%`],
+      ],
+    },
+    {
+      title: 'Other',
+      rows: [
+        ['Rebounds / game', fmt(colAvg(games, 'rebounds'), 1), true],
         ['Assists / game', fmt(colAvg(games, 'assists'), 1), true],
         ['Steals / game', fmt(colAvg(games, 'steals'), 1)],
         ['Blocks / game', fmt(colAvg(games, 'blocks'), 1)],
@@ -1884,16 +1967,19 @@ export function updatePlayerStats(container, built, seasonsLoader, metadataLoade
         allShots = shots;
         rerenderShotChart();
       }
-    }).catch(() => {
+    }).catch((err) => {
       if (reqId !== playerStatsReqId) return;
       d3.select(chartEl).selectAll('*').remove();
+      const errorMsg = err?.message?.includes("1996 and 2024")
+        ? "Shot data available\nonly between 1996 and 2024"
+        : "No shot data";
       d3.select(chartEl)
         .attr("viewBox", "0 20 440 424").attr("preserveAspectRatio", "xMidYMid meet")
         .append("text")
-          .attr("x", 218).attr("y", 230)
+          .attr("x", 218).attr("y", 220)
           .attr("text-anchor", "middle")
-          .attr("fill", "#ffffff").attr("font-size", 16)
-          .text("No shot data");
+          .attr("fill", "#ffffff").attr("font-size", 15)
+          .text(errorMsg);
     });
 
       Promise.all([

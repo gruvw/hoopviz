@@ -99,6 +99,12 @@ function getShotFile(season) {
 
 export async function loadShots(personId, season, gameType = "Regular Season") {
   const requestId = ++_shotRequestId;
+  const seasonNum = +season;
+
+  if (seasonNum < 1996 || seasonNum > 2024) {
+    throw new Error("Shot data available  only between 1996 and 2024");
+  }
+
   let rows;
   try {
     rows = await d3.csv(getShotFile(season));
