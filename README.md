@@ -7,7 +7,7 @@ By using multiple seasons of data, we are building a "time-traveling" experience
 
 **Live Website: <https://com-480-data-visualization.github.io/HoopViz/>**
 
-**Video Demo:** TODO
+**Video Demo:** <https://youtu.be/H1Zgz_uHQyw>
 
 ## Deliverables
 
