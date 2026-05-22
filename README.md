@@ -5,7 +5,7 @@ While most basketball statistics sites feel like looking at a tax return, we wan
 
 By using multiple seasons of data, we are building a "time-traveling" experience where users can slide through history to see how the league has evolved over the years with interesting transitions.
 
-**Live Website: <https://com-480-data-visualization.github.io/HoopViz/>** (use a chromimum based destkop browser)
+**Live Website: <https://com-480-data-visualization.github.io/HoopViz/>** (use a chromium based desktop browser)
 
 **Video Demo:** <https://youtu.be/H1Zgz_uHQyw>
 
