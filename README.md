@@ -21,7 +21,7 @@ Project of Data Visualization (EPFL COM-480) - 2026
 
 - [Milestone 1](./deliverables/ms1/ms1.md)
 - [Milestone 2](./deliverables/ms2/ms2.pdf)
-- [Milestone 3](./deliverables/ms3/ms3.md)
+- [Milestone 3](./deliverables/ms3/process_book.pdf)
 
 **Note**: Each deliverable comes with its associated GitHub release of the repository.
 
